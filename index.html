@@ -205,7 +205,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.12';
+const VER='1.13';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -313,12 +313,16 @@ return out.sort((a,b)=>b.yrs-a.yrs)}
 async function notify(title,body){try{if(!('Notification'in window)||Notification.permission!=='granted')return;const reg=await navigator.serviceWorker?.getRegistration();if(reg)reg.showNotification(title,{body,icon:'icon-192.png',badge:'icon-192.png'});else new Notification(title,{body})}catch(e){}}
 
 /* ---------- concerti (Ticketmaster) ---------- */
-async function concertsFor(name){if(!S.settings.tm)return[];
-return cached('tm:'+name,12*3600e3,async()=>{const r=await fetch(`https://app.ticketmaster.com/discovery/v2/events.json?apikey=${enc(S.settings.tm)}&keyword=${enc(name)}&classificationName=music&size=60&sort=date,asc`);
+async function concertsFor(name,fresh=false){if(!S.settings.tm)return[];
+return cached('tm:'+name,fresh?0:12*3600e3,async()=>{await sleep(260);const r=await fetch(`https://app.ticketmaster.com/discovery/v2/events.json?apikey=${enc(S.settings.tm)}&keyword=${enc(name)}&classificationName=music&size=60&sort=date,asc`);
 if(!r.ok)throw new Error('Ticketmaster '+r.status);const j=await r.json();
 return((j._embedded&&j._embedded.events)||[]).filter(e=>((e._embedded&&e._embedded.attractions)||[]).some(a=>norm(a.name)===norm(name))).map(e=>{const v=(e._embedded.venues||[])[0]||{};
 return{id:e.id,name:e.name,date:e.dates?.start?.localDate||'',time:(e.dates?.start?.localTime||'').slice(0,5),venue:v.name||'',city:v.city?.name||'',cc:v.country?.countryCode||'',country:v.country?.name||'',url:e.url,artist:name}})}).catch(()=>[])}
-async function allConcerts(){const out=[];for(const a of Object.values(S.artists)){out.push(...await concertsFor(a.name))}const seen=new Set();return out.filter(c=>!seen.has(c.id)&&seen.add(c.id)).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))}
+async function checkGigs(force=false){if(!S.settings.tm||!Object.keys(S.artists).length)return;if(!force&&Date.now()-(S.lastGigs||0)<20*3600e3)return;
+S.seenGigs=S.seenGigs||{};const first=!S.lastGigs;const all=await allConcerts(true);const fresh=all.filter(c=>c.cc==='IT'&&c.date>=today()&&!S.seenGigs[c.id]);
+fresh.forEach(c=>S.seenGigs[c.id]=first?'old':'new');S.lastGigs=Date.now();save();
+if(!first&&fresh.length)notify(fresh.length===1?`🎫 ${fresh[0].artist} in concerto`:`🎫 ${fresh.length} nuovi concerti in Italia`,fresh.slice(0,3).map(c=>`${c.artist} · ${c.city} · ${fmtDate(c.date)}`).join('\n'));if(route().v==='home'||route().v==='concerti')render()}
+async function allConcerts(fresh=false){const out=[];for(const a of Object.values(S.artists)){out.push(...await concertsFor(a.name,fresh))}const seen=new Set();return out.filter(c=>!seen.has(c.id)&&seen.add(c.id)).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))}
 
 /* ---------- Wikipedia / Wikidata ---------- */
 async function wikiInfo(qid){return cached('wd:'+qid,30*DAY,async()=>{const j=await (await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${qid}&props=sitelinks|claims&format=json&origin=*`)).json();
@@ -375,7 +379,7 @@ if(otd.length)html+=`<div class="sec"><h2>Accadde oggi</h2></div>${otd.map(x=>`<
 html+=`<div class="sec"><h2>I tuoi artisti</h2><a class="more" href="#artisti">Tutti</a></div><div class="hscroll">${Object.values(S.artists).sort((a,b)=>(b.addedAt||0)-(a.addedAt||0)).slice(0,20).map(a=>`<a class="av" href="#artista/${a.mbid}">${avatar(a.name)}<div class="n">${esc(a.name)}</div></a>`).join('')}</div>`;
 if(S.settings.tm)html+=`<div class="sec"><h2>Concerti in Italia</h2><a class="more" href="#concerti">Tutti</a></div><div id="hc">${loading}</div>`;
 $('#hn').innerHTML=html;
-if(S.settings.tm){const cs=(await allConcerts()).filter(c=>c.cc==='IT').slice(0,4);if(!ok())return;const e=$('#hc');if(e)e.innerHTML=cs.length?cs.map(concertRow).join(''):'<div class="card muted small">Nessun concerto in Italia annunciato per ora.</div>'}}
+if(S.settings.tm){const cs=(await allConcerts()).filter(c=>c.cc==='IT'&&c.date>=today()).slice(0,4);if(!ok())return;const e=$('#hc');if(e)e.innerHTML=cs.length?cs.map(concertRow).join(''):'<div class="card muted small">Nessun concerto in Italia annunciato per ora.</div>'}}
 window.markAll=()=>{for(const k in S.seen)if(S.seen[k]==='new')S.seen[k]='old';save();render()};
 
 /* ---------- ARTISTI ---------- */
@@ -401,7 +405,7 @@ app.innerHTML=`<a class="iconbtn back" href="javascript:history.back()">${I.back
 <button class="iconbtn star" id="favb" style="width:48px;height:48px;color:var(--gold);background:var(--glass);backdrop-filter:blur(12px)" onclick="toggleFav('${mbid}',${esc(JSON.stringify(a.name))})">${fav?I.starF:I.starO}</button></div>
 <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:4px">
 <a class="btn sm" target="_blank" href="https://open.spotify.com/search/${enc(a.name)}">Ascolta su Spotify</a>
-<a class="btn sm ghost" target="_blank" href="https://www.setlist.fm/search?query=${enc(a.name)}">Scalette</a>
+<a class="btn sm ghost" target="_blank" href="https://www.setlist.fm/search?query=${enc(a.name)}">Scalette</a><a class="btn sm ghost" target="_blank" href="https://www.ticketone.it/search/?searchterm=${enc(a.name)}">TicketOne</a>
 ${site?`<a class="btn sm ghost" target="_blank" href="${esc(site.url.resource)}">Sito ufficiale</a>`:''}</div>
 <div class="tabs" id="atabs"></div><div id="abody">${loading}</div>`;
 artistPhoto(a.name).then(u=>{const e=$('#hbg');if(e&&u)e.style.backgroundImage=`url("${u}")`;else if(e&&qid)wikiInfo(qid).then(w=>{if(w.img&&$('#hbg'))$('#hbg').style.backgroundImage=`url("${w.img}")`}).catch(()=>{})});
@@ -454,7 +458,7 @@ if(alb.length){const f=alb[0],l=alb[alb.length-1];html+=`<div class="sec"><h2>Cu
 ${alb.length>2?(()=>{let g=0,gi=0;for(let i=1;i<alb.length;i++){const d=+alb[i].d.slice(0,4)-+alb[i-1].d.slice(0,4);if(d>g){g=d;gi=i}}return g>=4?`<p class="ann">La pausa più lunga: ${g} anni, tra <b>${esc(alb[gi-1].t)}</b> e <b>${esc(alb[gi].t)}</b>.</p>`:''})():''}
 ${(()=>{const D={};alb.forEach(r=>{const d=Math.floor(+r.d.slice(0,4)/10)*10;D[d]=(D[d]||0)+1});const b=Object.entries(D).sort((x,y)=>y[1]-x[1])[0];return b&&b[1]>1?`<p class="ann">Il decennio più prolifico: gli ${decName(+b[0]).toLowerCase()}, con ${b[1]} album.</p>`:''})()}</div>`}
 return html}
-function concertRow(c){const[y,m,d]=(c.date||'--').split('-');return `<a class="li" target="_blank" href="${esc(c.url)}"><div class="date"><b>${+d||'?'}</b><span>${m?MES3[+m-1]:''}</span></div><div class="tx"><b>${esc(c.artist)}</b><span>${esc([c.city,c.venue].filter(Boolean).join(' · '))}${c.cc&&c.cc!=='IT'?' · '+esc(c.country):''}${y?' · '+y:''}${c.time?' · ore '+c.time:''}</span></div><span class="small" style="color:var(--gold);font-weight:600">Biglietti</span></a>`}
+function concertRow(c){const[y,m,d]=(c.date||'--').split('-');const nw=(S.seenGigs||{})[c.id]==='new';return `<a class="li" target="_blank" href="${esc(c.url)}" onclick="if((S.seenGigs||{})['${c.id}']==='new'){S.seenGigs['${c.id}']='old';save()}"><div class="date"><b>${+d||'?'}</b><span>${m?MES3[+m-1]:''}</span></div><div class="tx"><b>${esc(c.artist)}${nw?' <span class="badge">Nuovo</span>':''}</b><span>${esc([c.city,c.venue].filter(Boolean).join(' · '))}${c.cc&&c.cc!=='IT'?' · '+esc(c.country):''}${y?' · '+y:''}${c.time?' · ore '+c.time:''}</span></div><span class="small" style="color:var(--gold);font-weight:600">Biglietti</span></a>`}
 
 /* ---------- SCHEDA ALBUM ---------- */
 async function vAlbum(app,rgid,ok){app.innerHTML=loading;let rg;
@@ -514,17 +518,17 @@ return`<div class="li">${rgid?`<a class="th" href="#album/${rgid}">${coverImg(rg
 catch(e){if(id===searchId)R.innerHTML=`<div class="empty">Ricerca non riuscita (${esc(e.message)}). Riprova tra un attimo.</div>`}}
 
 /* ---------- CONCERTI ---------- */
-let ctab='it';
+let ctab='m';
 async function vConcerts(app,_,ok){app.innerHTML=`<div class="top"><h1 style="font-size:30px">Concerti</h1><button class="iconbtn" onclick="addDiary()">${I.plus}</button></div>
-<div class="tabs" id="ct">${[['it','🇮🇹 Italia'],['w','Nel mondo'],['d','Il mio diario']].map(([k,l])=>`<button class="tab ${k===ctab?'on':''}" data-k="${k}">${l}</button>`).join('')}</div><div id="cb">${loading}</div>`;
+<div class="tabs" id="ct">${[['m','Prossimi 30 giorni'],['it','🇮🇹 Italia'],['w','Nel mondo'],['d','Il mio diario']].map(([k,l])=>`<button class="tab ${k===ctab?'on':''}" data-k="${k}">${l}</button>`).join('')}</div><div id="cb">${loading}</div>`;
 $('#ct').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ctab=b.dataset.k;vConcerts(app,_,ok)});const B=$('#cb');
 if(ctab==='d'){const L=S.diary.slice().sort((a,b)=>b.date.localeCompare(a.date));B.innerHTML=L.length?`<p class="small muted">${L.length} ${L.length===1?'concerto visto':'concerti visti'}</p>`+L.map((c,i)=>{const[y,m,d]=c.date.split('-');return`<div class="li" onclick="addDiary('${c.id}')"><div class="date"><b>${+d}</b><span>${MES3[+m-1]} ${y.slice(2)}</span></div><div class="tx"><b>${esc(c.artist)}</b><span>${esc([c.city,c.venue].filter(Boolean).join(' · '))}${c.note?' · '+esc(c.note):''}</span></div></div>`}).join(''):`<div class="card empty"><h3>Il tuo diario dei concerti</h3><p>Annota i concerti a cui sei stato: data, città, locale e un ricordo.</p><button class="btn" style="margin-top:12px" onclick="addDiary()">Aggiungi un concerto</button></div>`;return}
 if(!S.settings.tm){B.innerHTML=`<div class="card"><h3 style="font-size:19px">Attiva i concerti</h3><p class="small muted" style="line-height:1.5">I concerti arrivano da Ticketmaster. Serve una chiave gratuita: inseriscila nelle Impostazioni.</p><a class="btn sm" href="#impostazioni">Vai alle Impostazioni</a></div>`;return}
 if(!Object.keys(S.artists).length){B.innerHTML='<div class="empty">Aggiungi prima i tuoi artisti.</div>';return}
 B.innerHTML=`<div id="prog2" class="small muted">Cerco i concerti dei tuoi ${Object.keys(S.artists).length} artisti…</div>`;
-const all=await allConcerts();if(!ok()||ctab==='d')return;const L=all.filter(c=>ctab==='it'?c.cc==='IT':c.cc!=='IT');
+const all=await allConcerts();if(!ok()||ctab==='d')return;const lim=new Date(Date.now()+30*DAY).toISOString().slice(0,10);const L=all.filter(c=>c.date>=today()&&(ctab==='m'?(c.cc==='IT'&&c.date<=lim):ctab==='it'?c.cc==='IT':c.cc!=='IT'));
 let html='',mon='';for(const c of L){const k=c.date.slice(0,7);if(k!==mon){mon=k;html+=`<div class="dec">${MESI[+k.slice(5)-1]} ${k.slice(0,4)}</div>`}html+=concertRow(c)}
-B.innerHTML=html||`<div class="card muted small">Nessun concerto ${ctab==='it'?'in Italia':'all\'estero'} annunciato per i tuoi artisti.</div>`}
+B.innerHTML=(ctab==='m'?`<p class="small muted" style="margin:10px 0 0">Chi dei tuoi artisti suona in Italia da oggi al ${fmtDate(lim)}.</p>`:'')+(html||`<div class="card muted small" style="margin-top:12px">Nessun concerto ${ctab==='m'?'in Italia nel prossimo mese':ctab==='it'?'in Italia':'all\'estero'} annunciato per i tuoi artisti.</div>`)+`<p class="small muted" style="margin-top:18px;line-height:1.5">Le date arrivano da Ticketmaster. Alcuni concerti italiani in vendita solo su TicketOne potrebbero mancare: dalla scheda dell'artista puoi cercarli anche lì.</p>`}
 window.addDiary=function(id){const c=S.diary.find(x=>x.id===id)||{date:today(),artist:'',city:'',venue:'',note:''};
 const s=sheet(`<h2 style="margin-bottom:14px">${id?'Modifica concerto':'Nuovo concerto visto'}</h2>
 <div class="field"><label>Artista</label><input id="da" list="dal" value="${esc(c.artist)}"><datalist id="dal">${Object.values(S.artists).map(a=>`<option value="${esc(a.name)}">`).join('')}</datalist></div>
@@ -656,7 +660,7 @@ function vSettings(app){const perm='Notification'in window?Notification.permissi
 app.innerHTML=`<a class="iconbtn back" href="#home">${I.back}</a><div style="padding-top:50px"><h1 style="font-size:30px;margin-bottom:18px">Impostazioni</h1>
 <div class="card"><h3 style="font-size:19px">Spotify</h3><p class="small muted" style="line-height:1.5">Importa gli artisti che segui e quelli che ascolti di più. Redirect URI da usare su Spotify:<br><b style="color:var(--tx);word-break:break-all">${esc(redirectUri())}</b></p>
 <div class="field"><label>Client ID</label><input id="sp" value="${esc(S.settings.sp)}" placeholder="incolla qui il Client ID"></div><button class="btn sm" onclick="saveSet();spLogin()">Importa da Spotify</button></div>
-<div class="card" style="margin-top:14px"><h3 style="font-size:19px">Concerti (Ticketmaster)</h3><p class="small muted" style="line-height:1.5">Chiave gratuita da developer.ticketmaster.com (la "Consumer Key").</p><div class="field"><label>Chiave</label><input id="tm" value="${esc(S.settings.tm)}"></div><button class="btn sm ghost" onclick="saveSet();toast('Salvato')">Salva</button></div>
+<div class="card" style="margin-top:14px"><h3 style="font-size:19px">Concerti (Ticketmaster)</h3><p class="small muted" style="line-height:1.5">Chiave gratuita da developer.ticketmaster.com (la "Consumer Key").</p><div class="field"><label>Chiave</label><input id="tm" value="${esc(S.settings.tm)}"></div><button class="btn sm ghost" onclick="saveSet();toast('Salvato: cerco i concerti…');checkGigs(true)">Salva</button></div>
 <div class="card" style="margin-top:14px"><h3 style="font-size:19px">Sincronizzazione</h3><p class="small muted" style="line-height:1.5">Come per Visto!: i dati restano nel repository privato su GitHub e si allineano tra iPhone, iPad e PC.</p>
 <div class="field"><label>Utente GitHub</label><input id="ghu" value="${esc(K.ghUser)}"></div><div class="field"><label>Repository privato</label><input id="ghr" value="${esc(K.ghRepo)}"></div><div class="field"><label>Token</label><input id="ght" type="password" value="${esc(K.gh)}" placeholder="github_pat_…"></div>
 <button class="btn sm" onclick="saveSet();doSync()">Salva e sincronizza</button></div>
@@ -693,7 +697,7 @@ setTimeout(hide,4300)}
 /* ---------- avvio ---------- */
 applyTheme();intro();render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-(async()=>{await spCallback();if(K.gh){try{await syncNow()}catch(e){}}setTimeout(()=>checkNews(),1500)})();
+(async()=>{await spCallback();if(K.gh){try{await syncNow()}catch(e){}}setTimeout(async()=>{await checkNews();checkGigs()},1500)})();
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(K.gh)syncNow().catch(()=>{});checkNews()}});
 </script>
 </body>
