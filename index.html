@@ -165,7 +165,7 @@ nav.bn a.on{color:var(--gold);background:var(--card2)}
 /* intro */
 #intro{position:fixed;inset:0;z-index:100;background:#060608;overflow:hidden;transition:opacity .9s ease,visibility .9s;display:grid;place-items:center}
 #intro.hide{opacity:0;visibility:hidden}
-.wall{position:absolute;left:50%;top:50%;width:190vmax;transform:translate(-50%,-50%) perspective(1000px) rotateX(22deg) rotateZ(-9deg);display:flex;flex-direction:column;gap:14px;opacity:0;transition:opacity 1.4s ease}
+.wall{position:absolute;left:50%;top:50%;width:190vmax;min-height:120vmax;justify-content:center;transform:translate(-50%,-50%) perspective(1000px) rotateX(22deg) rotateZ(-9deg);display:flex;flex-direction:column;gap:14px;opacity:0;transition:opacity 1.4s ease}
 .wall.on{opacity:1}
 .wrow{display:flex;gap:14px;width:max-content;animation:slide linear infinite}
 .wrow.rev{animation-direction:reverse}
@@ -205,7 +205,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.9';
+const VER='1.10';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -274,9 +274,11 @@ function hue(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;re
 function phHTML(title,sub){const h=hue(title);const ini=String(title||'?').replace(/[^\p{L}\p{N} ]/gu,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'♪';
 return `<div class="ph" style="background:linear-gradient(135deg,hsl(${h},35%,28%),hsl(${(h+50)%360},40%,14%))"><div>${esc(ini)}${sub?`<small>${esc(sub)}</small>`:''}</div></div>`}
 function caa(id,sz=250){return `https://coverartarchive.org/release-group/${id}/front-${sz}`}
-function coverImg(id,artist,title,sz=250){return `<img loading="lazy" src="${caa(id,sz)}" data-a="${esc(artist)}" data-t="${esc(title)}" onerror="coverFail(this)" alt="">`}
+function coverImg(id,artist,title,sz=250){return `<img loading="lazy" src="${caa(id,sz)}" data-a="${esc(artist)}" data-t="${esc(title)}" onerror="coverFail(this)" onload="wallAdd(this)" alt="">`}
+let wallT,wallL;try{wallL=JSON.parse(localStorage.getItem('ol-wall')||'[]')}catch(e){wallL=[]}
+window.wallAdd=function(el){const u=el.currentSrc||el.src;if(!u||u.startsWith('data:')||wallL.includes(u))return;wallL.unshift(u);if(wallL.length>140)wallL.length=140;clearTimeout(wallT);wallT=setTimeout(()=>{try{localStorage.setItem('ol-wall',JSON.stringify(wallL))}catch(e){}},1500)};
 window.coverFail=async function(el){if(el.dataset.tried){el.outerHTML=phHTML(el.dataset.t,el.dataset.a);return}el.dataset.tried=1;const u=await dzCover(el.dataset.a,el.dataset.t);if(u)el.src=u;else el.outerHTML=phHTML(el.dataset.t,el.dataset.a)};
-function avatar(name,cls='pic'){const id='p'+Math.random().toString(36).slice(2);artistPhoto(name).then(u=>{const e=document.getElementById(id);if(e)e.innerHTML=u?`<img src="${u}" alt="" loading="lazy">`:phHTML(name)});return `<div class="${cls}" id="${id}">${phHTML(name)}</div>`}
+function avatar(name,cls='pic'){const id='p'+Math.random().toString(36).slice(2);artistPhoto(name).then(u=>{const e=document.getElementById(id);if(e)e.innerHTML=u?`<img src="${u}" alt="" loading="lazy" onload="wallAdd(this)">`:phHTML(name)});return `<div class="${cls}" id="${id}">${phHTML(name)}</div>`}
 
 /* ---------- date ---------- */
 function fmtDate(d){if(!d)return'data ignota';const p=d.split('-');if(p.length===1)return p[0];if(p.length===2)return MESI[+p[1]-1]+' '+p[0];return (+p[2])+' '+MESI[+p[1]-1]+' '+p[0]}
@@ -669,16 +671,15 @@ window.checkNews=checkNews;window.go=go;window.I=I;
 
 /* ---------- INTRO ---------- */
 function eqHTML(n,cls=''){return `<div class="eq ${cls}">${Array.from({length:n},(_,i)=>`<b style="animation-delay:${(-(i*137)%900)}ms;animation-duration:${700+((i*53)%500)}ms"></b>`).join('')}</div>`}
-async function introCovers(){const ids=[];for(const k of Object.keys(S.artists)){const c=await idb.get('disc:'+k);if(c)c.v.filter(r=>{const t=typeOf(r);return t==='Album'||t==='EP'||t==='Live'}).forEach(r=>ids.push(caa(r.id,250)))}
-let urls=ids.sort(()=>Math.random()-.5).slice(0,60);
-if(urls.length<24){try{const d=await Promise.race([dz('chart/0/albums?limit=60'),sleep(1500).then(()=>null)]);if(d&&d.data)urls=urls.concat(d.data.map(a=>a.cover_medium).filter(Boolean)).sort(()=>Math.random()-.5)}catch(e){}}
-return urls}
+async function introCovers(){let urls=wallL.slice().sort(()=>Math.random()-.5);
+if(urls.length<24){try{const d=await Promise.race([dz('chart/0/albums?limit=60'),sleep(1200).then(()=>null)]);if(d&&d.data)urls=urls.concat(d.data.map(a=>a.cover_medium).filter(Boolean))}catch(e){}}
+return urls.slice(0,72)}
 async function intro(){const el=$('#intro');let done=false;const hide=()=>{if(done)return;done=true;el.classList.add('hide');setTimeout(()=>el.style.display='none',1000)};el.onclick=hide;
 if(sessionStorage.getItem('ol-intro')){el.style.display='none';return}sessionStorage.setItem('ol-intro',1);
 $('#ilogo').innerHTML=[...'Loud!'].map((c,i)=>`<span style="animation-delay:${150+i*110}ms">${c}</span>`).join('');
 $('#ieq').outerHTML=eqHTML(22);
 const urls=await introCovers();
-if(urls.length){const rows=4,per=Math.max(8,Math.ceil(urls.length/rows));let html='';for(let r=0;r<rows;r++){const seg=[];for(let i=0;i<per;i++)seg.push(urls[(r*per+i)%urls.length]);const imgs=seg.map(u=>`<img src="${esc(u)}" onerror="this.remove()" alt="">`).join('');html+=`<div class="wrow ${r%2?'rev':''}" style="animation-duration:${60+r*12}s">${imgs}${imgs}</div>`}
+if(urls.length){const rows=4,per=Math.max(8,Math.ceil(urls.length/rows));let html='';for(let r=0;r<rows;r++){const seg=[];for(let i=0;i<per;i++)seg.push(urls[(r*per+i)%urls.length]);const imgs=seg.map(u=>`<img src="${esc(u)}" style="opacity:0;transition:opacity .6s" onload="this.style.opacity=1" onerror="this.remove()" alt="">`).join('');html+=`<div class="wrow ${r%2?'rev':''}" style="animation-duration:${60+r*12}s">${imgs}${imgs}</div>`}
 $('#wall').innerHTML=html;requestAnimationFrame(()=>$('#wall').classList.add('on'))}
 setTimeout(hide,4300)}
 
