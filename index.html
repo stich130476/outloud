@@ -205,7 +205,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.11';
+const VER='1.12';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -475,18 +475,25 @@ app.innerHTML=`<a class="iconbtn back" href="javascript:history.back()">${I.back
 <button class="btn sm ghost" id="cdb" onclick="toggleCD()">${mine.cd?'✓ Ce l\'ho in CD':'Ce l\'ho in CD'}</button></div></div></div>
 <div class="sec"><h2>Il mio voto</h2></div><div class="stars" id="stars"></div>
 <textarea id="note" rows="3" placeholder="Un ricordo, un pensiero, il brano preferito…" style="margin-top:12px">${esc(mine.n||'')}</textarea>
-<div id="info"></div><div class="sec"><h2>Tracce</h2><span class="small muted">tocca ▶ per 30 secondi</span></div><div id="trk">${loading}</div>`;
+<div id="info"></div><div class="sec"><h2>Tracce</h2><span class="small muted">tocca ▶ per 30 secondi</span></div><div id="ed"></div><div id="trk">${loading}</div>`;
 const drawStars=()=>{$('#stars').innerHTML=[1,2,3,4,5].map(i=>`<button class="${(S.albums[rgid]?.r||0)>=i?'on':''}" data-i="${i}">★</button>`).join('');$('#stars').querySelectorAll('button').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;setAlb(rgid,{r:(S.albums[rgid]?.r===i?0:i)},rg,artist,aid);drawStars()})};drawStars();
 $('#note').onchange=e=>setAlb(rgid,{n:e.target.value.trim()},rg,artist,aid);
 window.toggleCD=()=>{setAlb(rgid,{cd:!S.albums[rgid]?.cd},rg,artist,aid);$('#cdb').textContent=S.albums[rgid]?.cd?'✓ Ce l\'ho in CD':'Ce l\'ho in CD';toast(S.albums[rgid]?.cd?'Aggiunto alla tua mensola':'Tolto dalla mensola')};
 if(!rels.length){$('#trk').innerHTML='<div class="card muted">Elenco tracce non disponibile.</div>';return}
-let rel;try{rel=await mbc(`release/${rels[0].id}?inc=recordings+labels+artist-rels`,30*DAY)}catch(e){$('#trk').innerHTML='<div class="card muted">Elenco tracce non disponibile.</div>';return}if(!ok())return;
+let eds=[];try{const bj=await mbc(`release?release-group=${rgid}&inc=media&limit=100`,30*DAY);eds=(bj.releases||[]).map(r=>({id:r.id,t:r.title,dis:r.disambiguation||'',d:r.date||'',c:r.country||'',n:(r.media||[]).reduce((x,m)=>x+(m['track-count']||0),0),m:(r.media||[]).length,st:r.status}))}catch(e){}
+if(!ok())return;const seen={};eds=eds.filter(e=>e.st!=='Bootleg'&&e.n).sort((x,y)=>(x.d||'9999').localeCompare(y.d||'9999')).filter(e=>{const k=e.t+'|'+e.dis+'|'+e.n;if(seen[k])return false;seen[k]=1;return true});
+const loadRel=async relId=>{$('#trk').innerHTML=loading;let rel;try{rel=await mbc(`release/${relId}?inc=recordings+labels+artist-rels`,30*DAY)}catch(e){$('#trk').innerHTML='<div class="card muted">Elenco tracce non disponibile.</div>';return}if(!ok())return;
 const ms=x=>x?`${Math.floor(x/60000)}:${String(Math.round(x/1000)%60).padStart(2,'0')}`:'';let tot=0;const media=rel.media||[];
-$('#trk').innerHTML=media.map((m,mi)=>`${media.length>1?`<div class="dec">${esc(m.format||'Disco')} ${mi+1}</div>`:''}${(m.tracks||[]).map(t=>{tot+=t.length||0;return`<div class="trk"><span class="no">${esc(t.number)}</span><span class="tt">${esc(t.title)}</span><span class="du">${ms(t.length)}</span><button class="play" data-a="${esc(artist)}" data-t="${esc(t.title)}" onclick="playPrev(this)">${I.play}</button>${spBtn(artist,t.title)}</div>`}).join('')}`).join('');
+$('#trk').innerHTML=media.map((m,mi)=>`${media.length>1?`<div class="dec">${esc(m.title||m.format||'Disco')} ${m.title?'':mi+1}</div>`:''}${(m.tracks||[]).map(t=>{tot+=t.length||0;return`<div class="trk"><span class="no">${esc(t.number)}</span><span class="tt">${esc(t.title)}</span><span class="du">${ms(t.length)}</span><button class="play" data-a="${esc(artist)}" data-t="${esc(t.title)}" onclick="playPrev(this)">${I.play}</button>${spBtn(artist,t.title)}</div>`}).join('')}`).join('');
 const labels=[...new Set((rel['label-info']||[]).map(l=>l.label?.name).filter(Boolean))];const prod=[...new Set((rel.relations||[]).filter(r=>r.type==='producer').map(r=>r.artist?.name))];
 const ntr=media.reduce((s,m)=>s+(m.tracks||[]).length,0);
-$('#info').innerHTML=`<div class="stats" style="margin-top:22px"><div class="stat"><b>${rg['first-release-date']?fmtDate(rg['first-release-date']).replace(/ \d{4}$/,'')||'—':'—'}</b><span>uscita ${rg['first-release-date']?.slice(0,4)||''}</span></div><div class="stat"><b>${ntr}</b><span>tracce</span></div>${tot?`<div class="stat"><b>${Math.round(tot/60000)}′</b><span>durata totale</span></div>`:''}${labels.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(labels.slice(0,2).join(', '))}</b><span>etichetta</span></div>`:''}${prod.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(prod.slice(0,2).join(', '))}</b><span>produzione</span></div>`:''}<div class="stat"><b>${rels.length}</b><span>edizioni pubblicate</span></div></div>`}
-function setAlb(id,patch,rg,artist,aid){const cur=S.albums[id]||{t:rg.title,a:artist,aid,d:rg['first-release-date']||''};Object.assign(cur,patch);if(!cur.cd&&!cur.r&&!cur.n)delete S.albums[id];else S.albums[id]=cur;save()}
+$('#info').innerHTML=`<div class="stats" style="margin-top:22px"><div class="stat"><b>${rg['first-release-date']?fmtDate(rg['first-release-date']).replace(/ \d{4}$/,'')||'—':'—'}</b><span>uscita ${rg['first-release-date']?.slice(0,4)||''}</span></div><div class="stat"><b>${ntr}</b><span>tracce${media.length>1?` · ${media.length} dischi`:''}</span></div>${tot?`<div class="stat"><b>${Math.round(tot/60000)}′</b><span>durata totale</span></div>`:''}${labels.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(labels.slice(0,2).join(', '))}</b><span>etichetta</span></div>`:''}${prod.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(prod.slice(0,2).join(', '))}</b><span>produzione</span></div>`:''}<div class="stat"><b>${eds.length||rels.length}</b><span>edizioni pubblicate</span></div></div>`};
+const mineRel=S.albums[rgid]?.rel;const cur=(mineRel&&eds.find(e=>e.id===mineRel))?mineRel:(eds[0]?.id||rels[0].id);
+if(eds.length>1){const lab=e=>`${e.dis?e.dis.charAt(0).toUpperCase()+e.dis.slice(1):e.t}${e.d?' · '+e.d.slice(0,4):''}${e.c&&e.c!=='XW'?' · '+e.c:''} · ${e.n} brani${e.m>1?' ('+e.m+' dischi)':''}`;
+$('#ed').innerHTML=`<div class="field" style="margin-bottom:6px"><label>Edizione${mineRel?' · <span style="color:var(--gold)">la tua</span>':''}</label><select id="edsel">${eds.map(e=>`<option value="${e.id}" ${e.id===cur?'selected':''}>${esc(lab(e))}</option>`).join('')}</select></div>`;
+$('#edsel').onchange=e=>{setAlb(rgid,{rel:e.target.value},rg,artist,aid);loadRel(e.target.value);toast('Edizione salvata')}}
+loadRel(cur)}
+function setAlb(id,patch,rg,artist,aid){const cur=S.albums[id]||{t:rg.title,a:artist,aid,d:rg['first-release-date']||''};Object.assign(cur,patch);if(!cur.cd&&!cur.r&&!cur.n&&!cur.rel)delete S.albums[id];else S.albums[id]=cur;save()}
 
 /* ---------- RICERCA ---------- */
 let sq='',sk='artist';
