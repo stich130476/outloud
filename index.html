@@ -198,7 +198,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.2';
+const VER='1.3';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -595,6 +595,8 @@ let syncing=false;
 async function syncNow(pushOnly=false){if(!K.gh||syncing)return;syncing=true;try{const{data,sha}=await ghGet();
 const localEmpty=!Object.keys(S.artists).length&&!Object.keys(S.albums).length&&!S.diary.length;
 if(data&&localEmpty&&Object.keys(data.artists||{}).length){S=Object.assign(blank(),data);localStorage.setItem(LS,JSON.stringify(S));render();return'pulled'}
+const remoteEmpty=!data||(!Object.keys(data.artists||{}).length&&!Object.keys(data.albums||{}).length&&!(data.diary||[]).length);
+if(!localEmpty&&remoteEmpty){S.updatedAt=Date.now();localStorage.setItem(LS,JSON.stringify(S));await ghPut(sha);return'pushed'}
 if(data&&!pushOnly&&(data.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(blank(),data);localStorage.setItem(LS,JSON.stringify(S));render();return'pulled'}
 if(!data||(S.updatedAt||0)>(data.updatedAt||0)){if(data&&localEmpty)return'same';await ghPut(sha);return'pushed'}return'same'}finally{syncing=false}}
 
