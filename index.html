@@ -205,7 +205,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.10';
+const VER='1.11';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -674,7 +674,7 @@ function eqHTML(n,cls=''){return `<div class="eq ${cls}">${Array.from({length:n}
 async function introCovers(){let urls=wallL.slice().sort(()=>Math.random()-.5);
 if(urls.length<24){try{const d=await Promise.race([dz('chart/0/albums?limit=60'),sleep(1200).then(()=>null)]);if(d&&d.data)urls=urls.concat(d.data.map(a=>a.cover_medium).filter(Boolean))}catch(e){}}
 return urls.slice(0,72)}
-async function intro(){const el=$('#intro');let done=false;const hide=()=>{if(done)return;done=true;el.classList.add('hide');setTimeout(()=>el.style.display='none',1000)};el.onclick=hide;
+async function intro(){const el=$('#intro');let done=false;const hide=()=>{if(done)return;done=true;el.classList.add('hide');setTimeout(()=>el.style.display='none',1000)};el.onclick=hide;el.addEventListener('touchend',e=>{e.preventDefault();hide()},{passive:false});el.style.cursor='pointer';
 if(sessionStorage.getItem('ol-intro')){el.style.display='none';return}sessionStorage.setItem('ol-intro',1);
 $('#ilogo').innerHTML=[...'Loud!'].map((c,i)=>`<span style="animation-delay:${150+i*110}ms">${c}</span>`).join('');
 $('#ieq').outerHTML=eqHTML(22);
