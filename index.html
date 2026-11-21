@@ -19,11 +19,13 @@
 body.day{--bg:#f5f0e6;--bg2:#ece5d6;--card:rgba(0,0,0,.035);--card2:rgba(0,0,0,.07);--line:rgba(0,0,0,.09);--tx:#1d1b17;--mu:#6f695e;--gold:#a6802f;--gold2:#7d5e1c;--glass:rgba(250,246,238,.62);--shadow:0 14px 30px rgba(60,45,20,.15)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:15px;-webkit-font-smoothing:antialiased}
-body{min-height:100vh;background:radial-gradient(1200px 520px at 50% -180px,rgba(214,179,106,.16),transparent 70%),var(--bg);background-attachment:fixed}
-body.day{background:radial-gradient(1200px 520px at 50% -180px,rgba(214,179,106,.22),transparent 70%),var(--bg)}
+body{min-height:100vh;background:var(--bg)}
+body:before{content:"";position:fixed;left:0;right:0;top:0;height:420px;pointer-events:none;z-index:-1;background:radial-gradient(ellipse 90% 100% at 50% -40%,rgba(214,179,106,.14),transparent 70%)}
+html,body{overflow-x:hidden;max-width:100%}
+body.day:before{background:radial-gradient(ellipse 90% 100% at 50% -40%,rgba(214,179,106,.25),transparent 70%)}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
-input,textarea,select{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;width:100%;outline:none}
+input,textarea,select{font:inherit;font-size:16px;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;width:100%;outline:none}
 input:focus,textarea:focus{border-color:var(--gold)}
 h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0;letter-spacing:-.01em}
 #app{max-width:1100px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 110px)}
@@ -196,7 +198,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.1';
+const VER='1.2';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -233,7 +235,7 @@ let S;try{S=Object.assign(blank(),JSON.parse(localStorage.getItem(LS)||'{}'))}ca
 let K;try{K=Object.assign({gh:'',ghUser:OWNER_DEFAULT,ghRepo:'outloud-dati',theme:'dark'},JSON.parse(localStorage.getItem(LK)||'{}'))}catch(e){K={gh:'',ghUser:OWNER_DEFAULT,ghRepo:'outloud-dati',theme:'dark'}}
 function saveKeys(){localStorage.setItem(LK,JSON.stringify(K))}
 let pushT;
-function save(sync=true){S.updatedAt=Date.now();localStorage.setItem(LS,JSON.stringify(S));if(sync&&K.gh){clearTimeout(pushT);pushT=setTimeout(()=>syncNow(true).catch(()=>{}),2500)}}
+function save(sync=true,bump=true){if(bump)S.updatedAt=Date.now();localStorage.setItem(LS,JSON.stringify(S));if(sync&&K.gh){clearTimeout(pushT);pushT=setTimeout(()=>syncNow(true).catch(()=>{}),2500)}}
 
 /* ---------- cache (IndexedDB) ---------- */
 const idb=(()=>{let p;const db=()=>p||(p=new Promise((res,rej)=>{const r=indexedDB.open('outloud',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
@@ -591,8 +593,10 @@ async function ghPut(sha){const bytes=new TextEncoder().encode(JSON.stringify(S)
 const r=await fetch(ghU(),{method:'PUT',headers:ghH(),body:JSON.stringify({message:'OutLoud! sync',content:btoa(bin),...(sha?{sha}:{})})});if(!r.ok)throw new Error('GitHub '+r.status)}
 let syncing=false;
 async function syncNow(pushOnly=false){if(!K.gh||syncing)return;syncing=true;try{const{data,sha}=await ghGet();
+const localEmpty=!Object.keys(S.artists).length&&!Object.keys(S.albums).length&&!S.diary.length;
+if(data&&localEmpty&&Object.keys(data.artists||{}).length){S=Object.assign(blank(),data);localStorage.setItem(LS,JSON.stringify(S));render();return'pulled'}
 if(data&&!pushOnly&&(data.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(blank(),data);localStorage.setItem(LS,JSON.stringify(S));render();return'pulled'}
-if(!data||(S.updatedAt||0)>(data.updatedAt||0)){await ghPut(sha);return'pushed'}return'same'}finally{syncing=false}}
+if(!data||(S.updatedAt||0)>(data.updatedAt||0)){if(data&&localEmpty)return'same';await ghPut(sha);return'pushed'}return'same'}finally{syncing=false}}
 
 /* ---------- IMPOSTAZIONI ---------- */
 function vSettings(app){const perm='Notification'in window?Notification.permission:'unsupported';
@@ -608,7 +612,7 @@ app.innerHTML=`<a class="iconbtn back" href="#home">${I.back}</a><div style="pad
 <div class="tabs" style="margin:4px 0;flex-basis:100%">${[['dark','Sera'],['day','Giorno'],['auto','Automatico']].map(([k,l])=>`<button class="tab ${K.theme===k?'on':''}" onclick="setTheme('${k}')">${l}</button>`).join('')}</div><button class="btn sm ghost" onclick="checkNews(true);go('home')">Controlla novità ora</button></div></div>
 <div class="card" style="margin-top:14px"><h3 style="font-size:19px">Backup</h3><div class="row" style="gap:8px;margin-top:10px"><button class="btn sm ghost" onclick="exportData()">Esporta</button><label class="btn sm ghost">Importa<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label></div></div>
 <div class="sign">OutLoud! ${VER}<br>Stefano Fasolato 🖤💙</div></div>`}
-window.saveSet=()=>{S.settings.sp=$('#sp').value.trim();S.settings.tm=$('#tm').value.trim();K.ghUser=$('#ghu').value.trim()||OWNER_DEFAULT;K.ghRepo=$('#ghr').value.trim()||'outloud-dati';K.gh=$('#ght').value.trim();saveKeys();save(false)};
+window.saveSet=()=>{S.settings.sp=$('#sp').value.trim();S.settings.tm=$('#tm').value.trim();K.ghUser=$('#ghu').value.trim()||OWNER_DEFAULT;K.ghRepo=$('#ghr').value.trim()||'outloud-dati';K.gh=$('#ght').value.trim();saveKeys();save(false,false)};
 window.doSync=async()=>{if(!K.gh)return toast('Inserisci il token');try{const r=await syncNow();toast(r==='pulled'?'Dati scaricati da GitHub':r==='pushed'?'Dati salvati su GitHub':'Già allineato')}catch(e){toast('Errore: '+e.message)}};
 window.askNotif=async()=>{try{const p=await Notification.requestPermission();toast(p==='granted'?'Notifiche attive':'Notifiche non consentite');render()}catch(e){}};
 window.setTheme=t=>{K.theme=t;saveKeys();applyTheme();render()};
