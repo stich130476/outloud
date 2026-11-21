@@ -129,6 +129,12 @@ body.day .hero:after{background:linear-gradient(180deg,rgba(245,240,230,.05),rgb
 .jewel img{width:100%;height:100%;object-fit:cover}
 .jewel:before{content:"";position:absolute;left:0;top:0;bottom:0;width:9%;background:linear-gradient(90deg,rgba(0,0,0,.55),rgba(255,255,255,.12));z-index:1}
 .jewel:after{content:"";position:absolute;inset:0;background:linear-gradient(125deg,rgba(255,255,255,.28),transparent 35%,transparent 70%,rgba(255,255,255,.08));z-index:1}
+/* indice alfabetico */
+.azidx{position:fixed;right:2px;top:50%;transform:translateY(-50%);z-index:35;display:flex;flex-direction:column;align-items:center;padding:6px 3px;border-radius:12px;touch-action:none;user-select:none;-webkit-user-select:none}
+.azidx b{font-size:10.5px;line-height:1.38;font-weight:700;color:var(--gold);width:18px;text-align:center}
+.azidx b.off{color:var(--mu);opacity:.35}
+.azbig{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);z-index:70;width:86px;height:86px;border-radius:22px;display:grid;place-items:center;font-family:var(--serif);font-size:48px;color:var(--gold);background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--line);pointer-events:none;opacity:0;transition:opacity .15s}
+.azbig.on{opacity:1}
 /* nav */
 nav.bn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 10px);z-index:40;display:flex;gap:2px;padding:6px;border-radius:26px;background:var(--glass);backdrop-filter:blur(22px) saturate(170%);-webkit-backdrop-filter:blur(22px) saturate(170%);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.35);width:min(94vw,480px)}
 nav.bn a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px;border-radius:20px;font-size:10.5px;color:var(--mu);font-weight:600}
@@ -199,7 +205,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.7';
+const VER='1.8';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -371,10 +377,10 @@ if(S.settings.tm){const cs=(await allConcerts()).filter(c=>c.cc==='IT').slice(0,
 window.markAll=()=>{for(const k in S.seen)if(S.seen[k]==='new')S.seen[k]='old';save();render()};
 
 /* ---------- ARTISTI ---------- */
-function vArtists(app){const L=Object.values(S.artists).sort((a,b)=>a.name.localeCompare(b.name));
+function vArtists(app){const L=Object.values(S.artists).sort((a,b)=>sortName(a.name).localeCompare(sortName(b.name)));
 app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">I tuoi artisti</h1><div class="sub">${L.length} ${L.length===1?'artista':'artisti'}</div></div><div class="row"><button class="iconbtn" onclick="spLogin()" title="Importa da Spotify">${I.plus}</button></div></div>
-${L.length?`<div class="grid">${L.map(a=>`<a class="av" style="width:auto" href="#artista/${a.mbid}">${avatar(a.name)}<div class="n">${esc(a.name)}</div></a>`).join('')}</div>`:`<div class="card empty"><h3>Ancora nessun artista</h3><p>Importali da Spotify o cercali uno per uno.</p><div class="row" style="justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" onclick="spLogin()">Importa da Spotify</button><a class="btn ghost" href="#cerca">Cerca</a></div></div>`}`;
-app.querySelectorAll('.av .pic').forEach(p=>{p.style.width='100%';p.style.height='auto';p.style.aspectRatio='1'})}
+${L.length?(()=>{const G={};L.forEach(a=>(G[letterOf(a.name)]=G[letterOf(a.name)]||[]).push(a));return Object.keys(G).sort((a,b)=>a==='#'?-1:b==='#'?1:a.localeCompare(b)).map(l=>`<div class="dec" data-az="${l}" style="margin-right:22px">${l}</div><div class="grid" style="padding-right:22px">${G[l].map(a=>`<a class="av" style="width:auto" href="#artista/${a.mbid}">${avatar(a.name)}<div class="n">${esc(a.name)}</div></a>`).join('')}</div>`).join('')})():`<div class="card empty"><h3>Ancora nessun artista</h3><p>Importali da Spotify o cercali uno per uno.</p><div class="row" style="justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" onclick="spLogin()">Importa da Spotify</button><a class="btn ghost" href="#cerca">Cerca</a></div></div>`}`;
+app.querySelectorAll('.av .pic').forEach(p=>{p.style.width='100%';p.style.height='auto';p.style.aspectRatio='1'});setTimeout(attachIndex,0)}
 function addArtist(mbid,name,extra={}){if(S.artists[mbid])return;S.artists[mbid]={mbid,name,addedAt:Date.now(),...extra};save()}
 window.toggleFav=function(mbid,name){if(S.artists[mbid]){delete S.artists[mbid];toast('Tolto dai tuoi artisti')}else{addArtist(mbid,name);toast('Aggiunto ai tuoi artisti');discography(mbid).catch(()=>{})}save();
 const b=$('#favb');if(b)b.innerHTML=S.artists[mbid]?I.starF:I.starO};
@@ -527,7 +533,7 @@ let coltab='cd';
 function vCollection(app){const A=Object.entries(S.albums);const cds=A.filter(([,v])=>v.cd).sort((a,b)=>(a[1].a||'').localeCompare(b[1].a||'')||(a[1].d||'').localeCompare(b[1].d||''));const rated=A.filter(([,v])=>v.r).sort((a,b)=>b[1].r-a[1].r||(a[1].t||'').localeCompare(b[1].t||''));
 app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">La mia mensola</h1><div class="sub">${cds.length} CD · ${rated.length} album votati</div></div></div>
 <div class="tabs" id="colt">${[['cd','I miei CD'],['r','I miei voti'],['w','I miei anni']].map(([k,l])=>`<button class="tab ${k===coltab?'on':''}" data-k="${k}">${l}</button>`).join('')}</div><div id="colb"></div>`;
-$('#colt').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{coltab=b.dataset.k;vCollection(app)});
+$('#colt').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{coltab=b.dataset.k;vCollection(app)});setTimeout(()=>coltab==='cd'?attachIndex():document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove()),0);
 if(coltab==='w'){const W=Object.entries(S.wrapped||{}).sort((a,b)=>b[0]-a[0]);
 $('#colb').innerHTML=(W.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:14px">${W.map(([y,w])=>`<button class="card" style="text-align:left;background:linear-gradient(145deg,hsl(${hue(y)},40%,22%),hsl(${(hue(y)+60)%360},45%,10%));border:0;min-height:150px;display:flex;flex-direction:column;justify-content:space-between" onclick="vWrapped('${y}')"><span class="small" style="color:#f2dca4;letter-spacing:.12em;text-transform:uppercase;font-weight:700">Il mio anno</span><span><b style="font-family:var(--serif);font-size:38px;color:#fff;display:block">${y}</b><span class="small" style="color:rgba(255,255,255,.75)">${w.min!=null?w.min.toLocaleString('it-IT')+' minuti':''}${w.art?.[0]?' · n.1 '+esc(w.art[0].n):w.pl?' · '+w.pl.length+' brani':''}</span></span></button>`).join('')}</div>`:'')+
 `<div class="card" style="margin-top:18px"><h3 style="font-size:19px">${W.length?'Aggiorna i tuoi anni':'I tuoi Wrapped, anno per anno'}</h3><p class="small muted" style="line-height:1.55">Le playlist <b>"I tuoi brani preferiti del…"</b> salvate nella tua libreria vengono lette quando importi da Spotify. Per avere <b>tutti gli anni</b> con minuti, artisti, brani e album: su spotify.com → Account → Privacy → <b>Scarica i tuoi dati</b>, spunta <b>Cronologia streaming estesa</b>. Quando arriva l'email (qualche giorno), carica qui i file <b>Streaming_History_Audio_….json</b>.</p>
@@ -541,12 +547,26 @@ for(const ln of lines){i++;const m=ln.split(/\s+[-–—]\s+/);const a=(m[0]||''
 if(!a||!t){miss.push(ln);continue}try{const j=await mb(`release-group?query=${enc(`releasegroup:"${t}" AND artist:"${a}"`)}&limit=5`);const L=(j['release-groups']||[]).filter(r=>r.score>=75);const r=L.find(x=>norm(x.title)===norm(t))||L[0];
 if(r){const ar=(r['artist-credit']||[]).map(c=>c.name+(c.joinphrase||'')).join('');const cur=S.albums[r.id]||{t:r.title,a:ar,aid:r['artist-credit']?.[0]?.artist?.id,d:r['first-release-date']||''};cur.cd=true;S.albums[r.id]=cur;ok.push(ar+' – '+r.title)}else miss.push(ln)}catch(e){miss.push(ln)}}
 save();s.querySelector('.in').innerHTML=`<h2>Fatto!</h2><p>${ok.length} CD aggiunti alla mensola.</p>${miss.length?`<p class="small muted" style="margin-top:14px">Non trovati (${miss.length}): cercali a mano o correggi il nome.</p>${miss.map(x=>`<div class="li"><div class="tx"><b>${esc(x)}</b></div></div>`).join('')}`:''}<button class="btn" style="margin-top:14px" onclick="this.closest('.sheet').remove();render()">Chiudi</button>`}};
+function letterOf(n){const c=sortName(n).normalize('NFD').replace(/[\u0300-\u036f]/g,'').charAt(0).toUpperCase();return /[A-Z]/.test(c)?c:'#'}
+function attachIndex(){document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove());const marks=[...document.querySelectorAll('[data-az]')];if(marks.length<8)return;
+const have=new Set(marks.map(m=>m.dataset.az));const L=['#',...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+const idx=document.createElement('div');idx.className='azidx';idx.innerHTML=L.map(l=>`<b data-l="${l}" class="${have.has(l)?'':'off'}">${l}</b>`).join('');
+const big=document.createElement('div');big.className='azbig';document.body.append(idx,big);let last='',to;
+const go=y=>{const el=document.elementFromPoint(idx.getBoundingClientRect().left+10,y);if(!el||!el.dataset||!el.dataset.l)return;let l=el.dataset.l;
+let i=L.indexOf(l);while(i<L.length&&!have.has(L[i]))i++;if(i>=L.length)return;l=L[i];if(l===last)return;last=l;
+const t=marks.find(m=>m.dataset.az===l);if(t){window.scrollTo({top:t.getBoundingClientRect().top+scrollY-(innerHeight*.12),behavior:'instant'});try{navigator.vibrate&&navigator.vibrate(5)}catch(e){}}
+big.textContent=l;big.classList.add('on');clearTimeout(to);to=setTimeout(()=>big.classList.remove('on'),600)};
+idx.addEventListener('touchstart',e=>{e.preventDefault();last='';go(e.touches[0].clientY)},{passive:false});
+idx.addEventListener('touchmove',e=>{e.preventDefault();go(e.touches[0].clientY)},{passive:false});
+idx.addEventListener('mousedown',e=>{last='';go(e.clientY)})}
+window.addEventListener('hashchange',()=>document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove()));
 function sortName(n){return String(n||'').replace(/^the\s+/i,'').toLowerCase()}
 function shelfHTML(cds){const G={};cds.forEach(([id,v])=>{const k=v.a||'Senza artista';(G[k]=G[k]||{aid:v.aid,L:[]}).L.push([id,v])});
-const keys=Object.keys(G).sort((a,b)=>sortName(a).localeCompare(sortName(b)));
+const keys=Object.keys(G).sort((a,b)=>sortName(a).localeCompare(sortName(b)));shelfHTML._l='';
 return `<p class="small muted" style="margin:6px 0 0">${keys.length} artisti</p>`+keys.map(k=>{const g=G[k];g.L.sort((a,b)=>(a[1].d||'9999').localeCompare(b[1].d||'9999'));
-return `<a class="row" style="margin:26px 0 12px;gap:12px" ${g.aid?`href="#artista/${g.aid}"`:''}><div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex:none">${avatar(k,'pic" style="width:42px;height:42px;border:0;box-shadow:none')}</div><div style="flex:1"><div style="font-family:var(--serif);font-size:20px">${esc(k)}</div><div class="small muted">${g.L.length} CD</div></div></a>
-<div class="shelf">${g.L.map(([id,v])=>`<a href="#album/${id}"><div class="jewel">${coverImg(id,v.a,v.t)}</div><div class="alb"><div class="t">${esc(v.t)}</div><div class="y">${v.d?v.d.slice(0,4):'—'}</div></div></a>`).join('')}</div>`}).join('')}
+const lt=letterOf(k);const first=lt!==shelfHTML._l;shelfHTML._l=lt;
+return `${first?`<div data-az="${lt}" style="font-family:var(--serif);font-size:15px;color:var(--gold);margin:30px 0 -14px;padding-right:22px;border-bottom:1px solid var(--line)">${lt}</div>`:''}<a class="row" style="margin:26px 0 12px;gap:12px;padding-right:22px" ${g.aid?`href="#artista/${g.aid}"`:''}><div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex:none">${avatar(k,'pic" style="width:42px;height:42px;border:0;box-shadow:none')}</div><div style="flex:1"><div style="font-family:var(--serif);font-size:20px">${esc(k)}</div><div class="small muted">${g.L.length} CD</div></div></a>
+<div class="shelf" style="padding-right:22px">${g.L.map(([id,v])=>`<a href="#album/${id}"><div class="jewel">${coverImg(id,v.a,v.t)}</div><div class="alb"><div class="t">${esc(v.t)}</div><div class="y">${v.d?v.d.slice(0,4):'—'}</div></div></a>`).join('')}</div>`}).join('')}
 /* ---------- SPOTIFY ---------- */
 const redirectUri=()=>location.origin+location.pathname;
 const b64url=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
