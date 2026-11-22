@@ -212,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.18';
+const VER='1.19';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -401,17 +401,19 @@ html+=`<div class="sec" style="margin-top:8px"><h2>Il disco del giorno</h2><span
 setTimeout(()=>albumStory(did).then(t=>{const e=$('#dstory');if(e)e.textContent=t||(dv.d&&+dv.d.slice(0,4)<new Date().getFullYear()?`Uscito ${new Date().getFullYear()-+dv.d.slice(0,4)} anni fa. Rimettilo nel lettore!`:'')}),0);
 const rl=cdl.slice().sort((a,b)=>(a[1].lo||0)-(b[1].lo||0)).slice(0,Math.min(12,cdl.length));const [rid,rv]=rl[dayHash(weekKey())%rl.length];
 if(rid!==did)html+=`<a class="li" href="#album/${rid}" style="margin-top:10px;border:0;background:var(--card);border-radius:14px;padding:10px 12px"><div class="th">${coverImg(rid,rv.a,rv.t)}</div><div class="tx"><span style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Da riascoltare questa settimana</span><b>${esc(rv.t)}</b><span>${esc(rv.a)}${rv.lo?' · non lo apri da '+Math.round((Date.now()-rv.lo)/DAY)+' giorni':''}</span></div></a>`}
-const pr=Object.values(S.artists).filter(a=>a.prio);
+const pr=Object.values(S.artists).filter(a=>a.prio);const html0=html;html='';
 if(pr.length){const pn=news.filter(x=>isPrio(x.aid)).sort((a,b)=>b.d.localeCompare(a.d));
 html+=`<div class="sec"><h2>★ Le tue priorità</h2><a class="more" href="#artisti">Modifica</a></div><div class="hscroll" style="margin-bottom:4px">${pr.map(a=>`<a class="av" style="width:64px" href="#artista/${a.mbid}">${avatar(a.name,'pic prio" style="width:64px;height:64px')}<div class="n" style="font-size:11.5px">${esc(a.name)}</div></a>`).join('')}</div>`+
 (()=>{const grp=[['Nuovi dischi',x=>['Album','EP'].includes(typeOf(x))],['Singoli',x=>typeOf(x)==='Singolo'],['Raccolte e live',x=>['Raccolta','Live'].includes(typeOf(x))]];let h='';
 grp.forEach(([t,f])=>{const L=pn.filter(f).sort((a,b)=>b.d.localeCompare(a.d));if(L.length)h+=`<div class="dec" style="margin:18px 0 10px">${t}</div><div class="hscroll">${L.map(card).join('')}</div>`});
 if(S.settings.tm)h+=`<div class="dec" style="margin:18px 0 6px">Concerti in Italia</div><div id="hpc">${loading}</div>`;
 return h||`<div class="card muted small" style="margin-top:10px">Nessuna uscita recente dai tuoi gruppi prioritari: ti avviso io appena c'è qualcosa.</div>`})()}
+const prioHtml=html;html=html0;
 if(fut.length)html+=`<div class="sec"><h2>In arrivo</h2></div><div class="hscroll">${fut.map(card).join('')}</div>`;
 html+=`<div class="sec"><h2>Novità${nnew?` <span class="badge">${nnew}</span>`:''}</h2>${nnew?'<button class="more" onclick="markAll()">Segna come viste</button>':''}</div>`;
 html+=past.length?`<div class="hscroll">${past.sort((a,b)=>(isPrio(b.aid)-isPrio(a.aid))||b.d.localeCompare(a.d)).map(card).join('')}</div>`:`<div class="card muted small">${S.lastCheck?'Nessuna uscita negli ultimi due mesi e mezzo.':'Sto preparando le discografie: la prima volta ci vuole qualche minuto.'}</div>`;
 if(otd.length)html+=`<div class="sec"><h2>Accadde oggi</h2></div>${otd.map(x=>`<a class="li" href="#album/${x.id}"><div class="th">${coverImg(x.id,x.artist,x.t)}</div><div class="tx"><b>${esc(x.t)}</b><span>${esc(x.artist)} · usciva ${x.yrs} ${x.yrs===1?'anno':'anni'} fa</span></div></a>`).join('')}`;
+html+=prioHtml;
 html+=`<div class="sec"><h2>I tuoi artisti</h2><a class="more" href="#artisti">Tutti</a></div><div class="hscroll">${Object.values(S.artists).sort((a,b)=>(b.addedAt||0)-(a.addedAt||0)).slice(0,20).map(a=>`<a class="av" href="#artista/${a.mbid}">${avatar(a.name)}<div class="n">${esc(a.name)}</div></a>`).join('')}</div>`;
 if(S.settings.tm)html+=`<div class="sec"><h2>Concerti in Italia</h2><a class="more" href="#concerti">Tutti</a></div><div id="hc">${loading}</div>`;
 $('#hn').innerHTML=html;
