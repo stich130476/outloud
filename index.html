@@ -217,7 +217,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.26';
+const VER='1.27';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -544,10 +544,10 @@ app.innerHTML=`<a class="iconbtn back" href="javascript:history.back()">${I.back
 <div style="margin-top:12px">${genres.map(g=>`<span class="chip">${esc(g)}</span>`).join('')}</div>
 <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><a class="btn sm" target="_blank" href="https://open.spotify.com/search/${enc(artist+' '+rg.title)}">Ascolta su Spotify</a>
 <button class="btn sm ghost" id="cdb" onclick="toggleCD()">${mine.cd?'✓ Ce l\'ho in CD':'Ce l\'ho in CD'}</button></div></div></div>
-<div class="sec"><h2>Il mio voto</h2></div><div class="stars" id="stars"></div>
+<div class="sec"><h2>Le mie note</h2></div>
 <textarea id="note" rows="3" placeholder="Un ricordo, un pensiero, il brano preferito…" style="margin-top:12px">${esc(mine.n||'')}</textarea>
 <div id="info"></div><div class="sec"><h2>Tracce</h2><span class="small muted">tocca ▶ per 30 secondi</span></div><div id="ed"></div><div id="trk">${loading}</div>`;
-const drawStars=()=>{$('#stars').innerHTML=[1,2,3,4,5].map(i=>`<button class="${(S.albums[rgid]?.r||0)>=i?'on':''}" data-i="${i}">★</button>`).join('');$('#stars').querySelectorAll('button').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;setAlb(rgid,{r:(S.albums[rgid]?.r===i?0:i)},rg,artist,aid);drawStars()})};drawStars();
+const drawStars=()=>{if(!$('#stars'))return;$('#stars').innerHTML=[1,2,3,4,5].map(i=>`<button class="${(S.albums[rgid]?.r||0)>=i?'on':''}" data-i="${i}">★</button>`).join('');$('#stars').querySelectorAll('button').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;setAlb(rgid,{r:(S.albums[rgid]?.r===i?0:i)},rg,artist,aid);drawStars()})};drawStars();
 $('#note').onchange=e=>setAlb(rgid,{n:e.target.value.trim()},rg,artist,aid);
 window.toggleCD=()=>{setAlb(rgid,{cd:!S.albums[rgid]?.cd},rg,artist,aid);$('#cdb').textContent=S.albums[rgid]?.cd?'✓ Ce l\'ho in CD':'Ce l\'ho in CD';toast(S.albums[rgid]?.cd?'Aggiunto alla tua mensola':'Tolto dalla mensola')};
 if(!rels.length){$('#trk').innerHTML='<div class="card muted">Elenco tracce non disponibile.</div>';return}
@@ -610,11 +610,12 @@ if(id)$('#ddel',s).onclick=()=>{S.diary=S.diary.filter(x=>x.id!==id);tomb('c:'+i
 
 /* ---------- COLLEZIONE ---------- */
 let coltab='cd';
+if(!['cd','w'].includes(coltab))coltab='cd';
 function vCollection(app){const A=Object.entries(S.albums);const cds=A.filter(([,v])=>v.cd).sort((a,b)=>(a[1].a||'').localeCompare(b[1].a||'')||(a[1].d||'').localeCompare(b[1].d||''));const rated=A.filter(([,v])=>v.r).sort((a,b)=>b[1].r-a[1].r||(a[1].t||'').localeCompare(b[1].t||''));
-app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">La mia mensola</h1><div class="sub">${cds.length} CD · ${rated.length} album votati</div></div></div>
-<div class="tabs" id="colt">${[['cd','I miei CD'],['st','Statistiche'],['r','I miei voti'],['w','I miei anni']].map(([k,l])=>`<button class="tab ${k===coltab?'on':''}" data-k="${k}">${l}</button>`).join('')}</div><div id="colb"></div>`;
+app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">La mia mensola</h1><div class="sub">${cds.length} CD · ${new Set(cds.map(([,v])=>v.a)).size} artisti</div></div></div>
+<div class="tabs" id="colt">${[['cd','I miei CD'],['w','I miei anni']].map(([k,l])=>`<button class="tab ${k===coltab?'on':''}" data-k="${k}">${l}</button>`).join('')}</div><div id="colb"></div>`;
 $('#colt').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{coltab=b.dataset.k;vCollection(app)});setTimeout(()=>coltab==='cd'?attachIndex():document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove()),0);
-if(coltab==='st'){$('#colb').innerHTML=statsHTML();return}
+if(!['cd','w'].includes(coltab))coltab='cd';
 if(coltab==='w'){const W=Object.entries(S.wrapped||{}).sort((a,b)=>(b[0]==='sempre')-(a[0]==='sempre')||b[0]-a[0]);
 $('#colb').innerHTML=(W.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:14px">${W.map(([y,w])=>{const T=wrTracks(w).slice(0,4);return`<button class="wposter" ${y==='sempre'?'style="grid-column:1/-1;aspect-ratio:2/1"':''} onclick="vWrapped('${y}')"><div class="mos">${[0,1,2,3].map(i=>{const x=T[i];return x?`<div class="wtile ${x.img?'ok':''}" ${x.img?`style="background-image:url('${esc(x.img)}')"`:`data-tc='${esc(JSON.stringify([x.a,x.t]))}'`}></div>`:'<div class="wtile"></div>'}).join('')}</div><div class="lab"><div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#f2dca4;font-weight:700">${y==='sempre'?'I più ascoltati':'Il mio anno'}</div><div style="font-family:var(--serif);font-size:${y==='sempre'?34:40}px;line-height:1">${y==='sempre'?'Di sempre':y}</div><div style="font-size:11.5px;opacity:.85;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${T[0]?'n.1 '+esc(T[0].t):w.min!=null?w.min.toLocaleString('it-IT')+' minuti':''}</div></div></button>`}).join('')}</div>`:'')+
 `<div class="card" style="margin-top:18px"><h3 style="font-size:19px">${W.length?'Aggiorna i tuoi anni':'I tuoi Wrapped, anno per anno'}</h3><p class="small muted" style="line-height:1.55">Le playlist <b>"I tuoi brani preferiti del…"</b> salvate nella tua libreria vengono lette quando importi da Spotify. Per avere <b>tutti gli anni</b> con minuti, artisti, brani e album: su spotify.com → Account → Privacy → <b>Scarica i tuoi dati</b>, spunta <b>Cronologia streaming estesa</b>. Quando arriva l'email (qualche giorno), carica qui i file <b>Streaming_History_Audio_….json</b>.</p>
