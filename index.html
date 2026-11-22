@@ -136,7 +136,7 @@ body.day .hero:after{background:linear-gradient(180deg,rgba(245,240,230,.05),rgb
 .jewel:before{content:"";position:absolute;left:0;top:0;bottom:0;width:9%;background:linear-gradient(90deg,rgba(0,0,0,.55),rgba(255,255,255,.12));z-index:1}
 .jewel:after{content:"";position:absolute;inset:0;background:linear-gradient(125deg,rgba(255,255,255,.28),transparent 35%,transparent 70%,rgba(255,255,255,.08));z-index:1}
 /* indice alfabetico */
-.wtile{width:100%;height:100%;background-size:cover;background-position:center;background-color:rgba(255,255,255,.06);opacity:.35;transition:opacity .6s}.wtile.ok{opacity:1}
+.wtile{width:100%;height:100%;background-size:cover;background-position:center;background-color:rgba(255,255,255,.06);opacity:.55;transition:opacity .6s}.wtile.ok{opacity:1}
 .wposter{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:1;box-shadow:var(--shadow);display:block;text-align:left}
 .wposter .mos{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .wposter:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 30%,rgba(0,0,0,.82))}
@@ -217,7 +217,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.23';
+const VER='1.24';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -369,9 +369,14 @@ async function albumStory(id){return cached('story:'+id,30*DAY,async()=>{const r
 function topTracks(name){return cached('dztop:'+name,7*DAY,async()=>{const id=await dzArtistId(name);const m=id?{id}:null;if(!m)return[];
 const t=await dz(`artist/${m.id}/top?limit=20`);return((t&&t.data)||[]).map(x=>({t:x.title_short||x.title,album:x.album?.title||'',cover:x.album?.cover_medium||'',prev:x.preview||'',dur:x.duration?`${Math.floor(x.duration/60)}:${String(x.duration%60).padStart(2,'0')}`:''}))}).catch(()=>[])}
 function spBtn(a,t){return `<a class="play" style="background:rgba(30,215,96,.15);color:#1ed760" target="_blank" href="https://open.spotify.com/search/${enc((t+' '+a).replace(/\s*\(.*?\)\s*/g,' ').trim())}" title="Apri su Spotify"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.6 14.4a.6.6 0 0 1-.9.2c-2.4-1.5-5.4-1.8-9-1a.6.6 0 1 1-.3-1.2c3.9-.9 7.2-.5 9.9 1.1.3.2.4.6.3.9zm1.2-2.7a.8.8 0 0 1-1.1.3c-2.7-1.7-6.9-2.2-10.2-1.2a.8.8 0 0 1-.5-1.5c3.7-1.1 8.3-.6 11.4 1.3.4.2.5.7.4 1.1zm.1-2.8C14.7 9 9.4 8.8 6.3 9.7a.9.9 0 1 1-.5-1.8c3.5-1.1 9.4-.9 13.1 1.3a.9.9 0 0 1-1 1.7z"/></svg></a>`}
-function trackCover(a,t){return cached('tcov:'+a+'|'+t,60*DAY,async()=>{const d=await dz('search/track?limit=3&q='+enc(`artist:"${a.split(', ')[0]}" track:"${t}"`));const m=((d&&d.data)||[])[0];return m?.album?.cover_medium||''}).catch(()=>'')}
+function trackCover(a,t){const ar=a.split(', ')[0];const tt=t.replace(/\s*[\(\[].*?[\)\]]\s*/g,' ').replace(/\s+-\s+.*$/,'').trim();
+return cached('tc2:'+ar+'|'+tt,60*DAY,async()=>{for(const q of[`${ar} ${tt}`,`artist:"${ar}" track:"${tt}"`,`${tt}`]){try{const d=await dz('search/track?limit=5&q='+enc(q));const L=(d&&d.data)||[];
+const m=L.find(x=>norm(x.artist?.name)===norm(ar))||(q===tt?null:L[0]);if(m&&m.album?.cover_medium)return m.album.cover_medium}catch(e){}}return ''}).catch(()=>'')}
 function wrTracks(w){return (w.pl||w.tr||[]).map(x=>({t:x.t,a:x.a,img:x.img||'',p:x.p}))}
-async function fillCovers(root){for(const el of root.querySelectorAll('[data-tc]')){if(!el.isConnected)continue;const [a,t]=JSON.parse(el.dataset.tc);const u=await trackCover(a,t);if(u&&el.isConnected){el.style.backgroundImage=`url("${u}")`;el.classList.add('ok')}}}
+function fillCovers(root){const els=[...root.querySelectorAll('[data-tc]')];els.forEach(el=>{try{const [a,t]=JSON.parse(el.dataset.tc);el.style.backgroundColor=`hsl(${hue(t)},32%,24%)`}catch(e){}});
+const q=[];let busy=0;const run=()=>{while(busy<3&&q.length){const el=q.shift();if(!el.isConnected||el.dataset.done)continue;el.dataset.done=1;busy++;const [a,t]=JSON.parse(el.dataset.tc);
+trackCover(a,t).then(u=>{if(u&&el.isConnected){const im=new Image();im.onload=()=>{el.style.backgroundImage=`url("${u}")`;el.classList.add('ok')};im.src=u}}).finally(()=>{busy--;run()})}};
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);q.push(e.target);run()}}),{rootMargin:'300px'});els.forEach(el=>io.observe(el))}
 /* ---------- audio ---------- */
 const audio=new Audio();let playingBtn=null;
 audio.onended=()=>{if(playingBtn){playingBtn.classList.remove('on');playingBtn.innerHTML=I.play}playingBtn=null};
