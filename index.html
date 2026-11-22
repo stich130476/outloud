@@ -57,7 +57,13 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0;letter-spacing:-.01em
 .ph{width:100%;height:100%;display:grid;place-items:center;font-family:var(--serif);font-size:26px;color:rgba(255,255,255,.85);text-align:center;padding:8px}
 .ph small{display:block;font-family:var(--sans);font-size:10px;opacity:.7;margin-top:4px}
 /* news */
-.news{width:min(72vw,260px)}
+.news{width:min(40vw,170px)}
+.news .t{font-size:15px!important;margin-top:8px!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.news .a{font-size:12px!important}
+.news .m .chip{font-size:10.5px;padding:3px 8px}
+.news.prio .cov{box-shadow:0 0 0 2px var(--gold),var(--shadow)}
+.av .pic.prio{border-color:var(--gold)}
+.prioStar{color:var(--gold);font-size:12px}
 .news .t{font-family:var(--serif);font-size:17px;margin-top:10px;line-height:1.2}
 .news .a{color:var(--mu);font-size:13px;margin-top:3px}
 .news .m{margin-top:7px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -160,6 +166,7 @@ nav.bn a.on{color:var(--gold);background:var(--card2)}
 .field label{display:block;font-size:12.5px;color:var(--mu);margin-bottom:6px}
 .sign{text-align:center;color:var(--mu);font-size:12.5px;margin:40px 0 10px}
 .chk{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;flex:none}
+.chk{background:var(--bg)}
 .chk.on{background:var(--gold);border-color:var(--gold);color:#1a150c}
 .ann{border-left:3px solid var(--gold);padding-left:12px}
 /* intro */
@@ -195,7 +202,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 #intro .skip{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 26px);left:0;right:0;text-align:center;color:#6f6a60;font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:0;animation:fadeup .8s 2.2s forwards}
 .brandrow{display:flex;align-items:flex-end;gap:10px}
 .eq.mini{height:22px;gap:3px;margin:0 0 6px}.eq.mini b{width:3.5px}
-@media(min-width:800px){.hero{border-radius:0 0 28px 28px}.news{width:250px}.hero h1{font-size:48px}}
+@media(min-width:800px){.hero{border-radius:0 0 28px 28px}.news{width:190px}.hero h1{font-size:48px}}
 </style>
 </head>
 <body>
@@ -205,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.13';
+const VER='1.14';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -296,13 +303,22 @@ await idb.set(key,{t:Date.now(),v:out});return out}
 
 /* ---------- controllo novità ---------- */
 let checking=null;
+const PRIO_INIT=['The Smashing Pumpkins','Radiohead','Ministri','Foo Fighters','Calcutta','Blur','Silversun Pickups','The Zen Circus'];
+const isPrio=id=>!!(S.artists[id]&&S.artists[id].prio);
+window.togglePrio=function(id){const a=S.artists[id];if(!a)return;a.prio=!a.prio;save();toast(a.prio?`★ ${a.name} tra le priorità`:`${a.name} tolto dalle priorità`);return a.prio};
+async function initPrio(){S.prioDone=S.prioDone||[];const todo=PRIO_INIT.filter(n=>!S.prioDone.includes(n));if(!todo.length)return;S.prioDone.push(...todo);save();
+for(const name of todo){let a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));
+if(!a){try{const j=await mb(`artist?query=${enc('artist:"'+name+'"')}&limit=5`,false);const m=(j.artists||[]).find(x=>norm(x.name)===norm(name)&&x.score>=90);if(m){addArtist(m.id,m.name);a=S.artists[m.id];discography(m.id,false).catch(()=>{})}}catch(e){}}
+if(a)a.prio=true}save();if(route().v==='home'||route().v==='artisti')render()}
 async function checkNews(force=false){if(checking)return checking;const ids=Object.keys(S.artists);if(!ids.length)return;
 if(!force&&Date.now()-S.lastCheck<6*3600e3)return;
 checking=(async()=>{const fresh=[];let i=0;const cutoff=new Date(Date.now()-75*DAY).toISOString().slice(0,10);
 for(const id of ids){i++;setProgress(`Controllo novità ${i}/${ids.length}…`);const a=S.artists[id];
 try{const disc=await discography(id,false,true);for(const r of disc){if(r.d&&r.d>=cutoff){const k=r.id;if(!S.seen[k]){if(a.checked)fresh.push({...r,artist:a.name,aid:id});S.seen[k]=a.checked?'new':'old'}}}a.checked=1}catch(e){}}
 S.lastCheck=Date.now();save();setProgress('');
-if(fresh.length)notify(fresh.length===1?`Novità da ${fresh[0].artist}`:`${fresh.length} novità dai tuoi artisti`,fresh.slice(0,3).map(f=>`${f.artist} – ${f.t}`).join('\n'));
+const fp=fresh.filter(f=>isPrio(f.aid)),fo=fresh.filter(f=>!isPrio(f.aid));
+fp.slice(0,5).forEach(f=>notify(`★ ${f.d>today()?'In arrivo':'Nuovo '+typeOf(f).toLowerCase()} · ${f.artist}`,`${f.t}${f.d>today()?' — esce il '+fmtDate(f.d):''}`));
+if(fo.length)notify(fo.length===1?`Novità da ${fo[0].artist}`:`${fo.length} novità dai tuoi artisti`,fo.slice(0,3).map(f=>`${f.artist} – ${f.t}`).join('\n'));
 if(route().v==='home')render()})();try{await checking}finally{checking=null}}
 async function newsList(){const cutoff=new Date(Date.now()-75*DAY).toISOString().slice(0,10);const out=[];
 for(const id of Object.keys(S.artists)){const c=await idb.get('disc:'+id);if(!c)continue;for(const r of c.v)if(r.d&&r.d>=cutoff)out.push({...r,artist:S.artists[id].name,aid:id})}
@@ -321,6 +337,7 @@ return{id:e.id,name:e.name,date:e.dates?.start?.localDate||'',time:(e.dates?.sta
 async function checkGigs(force=false){if(!S.settings.tm||!Object.keys(S.artists).length)return;if(!force&&Date.now()-(S.lastGigs||0)<20*3600e3)return;
 S.seenGigs=S.seenGigs||{};const first=!S.lastGigs;const all=await allConcerts(true);const fresh=all.filter(c=>c.cc==='IT'&&c.date>=today()&&!S.seenGigs[c.id]);
 fresh.forEach(c=>S.seenGigs[c.id]=first?'old':'new');S.lastGigs=Date.now();save();
+if(!first)fresh.filter(c=>Object.values(S.artists).some(a=>a.prio&&a.name===c.artist)).slice(0,4).forEach(c=>notify(`★ 🎫 ${c.artist} in Italia`,`${c.city} · ${c.venue} · ${fmtDate(c.date)}`));
 if(!first&&fresh.length)notify(fresh.length===1?`🎫 ${fresh[0].artist} in concerto`:`🎫 ${fresh.length} nuovi concerti in Italia`,fresh.slice(0,3).map(c=>`${c.artist} · ${c.city} · ${fmtDate(c.date)}`).join('\n'));if(route().v==='home'||route().v==='concerti')render()}
 async function allConcerts(fresh=false){const out=[];for(const a of Object.values(S.artists)){out.push(...await concertsFor(a.name,fresh))}const seen=new Set();return out.filter(c=>!seen.has(c.id)&&seen.add(c.id)).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))}
 
@@ -369,23 +386,33 @@ setProgress(progressTxt);if(!n)return;
 const news=await newsList();if(!ok())return;
 const fut=news.filter(x=>x.d>today()).sort((a,b)=>a.d.localeCompare(b.d)),past=news.filter(x=>x.d<=today());
 const nnew=news.filter(x=>S.seen[x.id]==='new').length;
-const card=x=>`<a class="news" href="#album/${x.id}"><div class="cov">${coverImg(x.id,x.artist,x.t,500)}${S.seen[x.id]==='new'?'<span class="badge">Nuovo</span>':''}</div><div class="t">${esc(x.t)}</div><div class="a">${esc(x.artist)}</div><div class="m"><span class="chip" style="margin:0">${typeOf(x)}</span>${whenBadge(x.d)||`<span class="small muted">${fmtDate(x.d)}</span>`}</div></a>`;
+const card=x=>`<a class="news${isPrio(x.aid)?' prio':''}" href="#album/${x.id}"><div class="cov">${coverImg(x.id,x.artist,x.t,500)}${S.seen[x.id]==='new'?'<span class="badge">Nuovo</span>':''}</div><div class="t">${esc(x.t)}</div><div class="a">${isPrio(x.aid)?'<span class="prioStar">★</span> ':''}${esc(x.artist)}</div><div class="m"><span class="chip" style="margin:0">${typeOf(x)}</span>${whenBadge(x.d)||`<span class="small muted">${fmtDate(x.d)}</span>`}</div></a>`;
 const otd=await onThisDay();if(!ok())return;
-let html='';
+let html='';const pr=Object.values(S.artists).filter(a=>a.prio);
+if(pr.length){const pn=news.filter(x=>isPrio(x.aid)).sort((a,b)=>b.d.localeCompare(a.d));
+html+=`<div class="sec"><h2>★ Le tue priorità</h2><a class="more" href="#artisti">Modifica</a></div><div class="hscroll" style="margin-bottom:4px">${pr.map(a=>`<a class="av" style="width:64px" href="#artista/${a.mbid}">${avatar(a.name,'pic prio" style="width:64px;height:64px')}<div class="n" style="font-size:11.5px">${esc(a.name)}</div></a>`).join('')}</div>`+
+(()=>{const grp=[['Nuovi dischi',x=>['Album','EP'].includes(typeOf(x))],['Singoli',x=>typeOf(x)==='Singolo'],['Raccolte e live',x=>['Raccolta','Live'].includes(typeOf(x))]];let h='';
+grp.forEach(([t,f])=>{const L=pn.filter(f).sort((a,b)=>b.d.localeCompare(a.d));if(L.length)h+=`<div class="dec" style="margin:18px 0 10px">${t}</div><div class="hscroll">${L.map(card).join('')}</div>`});
+if(S.settings.tm)h+=`<div class="dec" style="margin:18px 0 6px">Concerti in Italia</div><div id="hpc">${loading}</div>`;
+return h||`<div class="card muted small" style="margin-top:10px">Nessuna uscita recente dai tuoi gruppi prioritari: ti avviso io appena c'è qualcosa.</div>`})()}
 if(fut.length)html+=`<div class="sec"><h2>In arrivo</h2></div><div class="hscroll">${fut.map(card).join('')}</div>`;
 html+=`<div class="sec"><h2>Novità${nnew?` <span class="badge">${nnew}</span>`:''}</h2>${nnew?'<button class="more" onclick="markAll()">Segna come viste</button>':''}</div>`;
-html+=past.length?`<div class="hscroll">${past.map(card).join('')}</div>`:`<div class="card muted small">${S.lastCheck?'Nessuna uscita negli ultimi due mesi e mezzo.':'Sto preparando le discografie: la prima volta ci vuole qualche minuto.'}</div>`;
+html+=past.length?`<div class="hscroll">${past.sort((a,b)=>(isPrio(b.aid)-isPrio(a.aid))||b.d.localeCompare(a.d)).map(card).join('')}</div>`:`<div class="card muted small">${S.lastCheck?'Nessuna uscita negli ultimi due mesi e mezzo.':'Sto preparando le discografie: la prima volta ci vuole qualche minuto.'}</div>`;
 if(otd.length)html+=`<div class="sec"><h2>Accadde oggi</h2></div>${otd.map(x=>`<a class="li" href="#album/${x.id}"><div class="th">${coverImg(x.id,x.artist,x.t)}</div><div class="tx"><b>${esc(x.t)}</b><span>${esc(x.artist)} · usciva ${x.yrs} ${x.yrs===1?'anno':'anni'} fa</span></div></a>`).join('')}`;
 html+=`<div class="sec"><h2>I tuoi artisti</h2><a class="more" href="#artisti">Tutti</a></div><div class="hscroll">${Object.values(S.artists).sort((a,b)=>(b.addedAt||0)-(a.addedAt||0)).slice(0,20).map(a=>`<a class="av" href="#artista/${a.mbid}">${avatar(a.name)}<div class="n">${esc(a.name)}</div></a>`).join('')}</div>`;
 if(S.settings.tm)html+=`<div class="sec"><h2>Concerti in Italia</h2><a class="more" href="#concerti">Tutti</a></div><div id="hc">${loading}</div>`;
 $('#hn').innerHTML=html;
-if(S.settings.tm){const cs=(await allConcerts()).filter(c=>c.cc==='IT'&&c.date>=today()).slice(0,4);if(!ok())return;const e=$('#hc');if(e)e.innerHTML=cs.length?cs.map(concertRow).join(''):'<div class="card muted small">Nessun concerto in Italia annunciato per ora.</div>'}}
+if(S.settings.tm){const allc=await allConcerts();if(!ok())return;const pnames=new Set(Object.values(S.artists).filter(a=>a.prio).map(a=>a.name));const pc=allc.filter(c=>c.cc==='IT'&&c.date>=today()&&pnames.has(c.artist));const ep=$('#hpc');if(ep)ep.innerHTML=pc.length?pc.slice(0,6).map(concertRow).join(''):'<div class="card muted small">Nessun concerto in Italia annunciato per ora.</div>';
+const cs=allc.filter(c=>c.cc==='IT'&&c.date>=today()).slice(0,4);const e=$('#hc');if(e)e.innerHTML=cs.length?cs.map(concertRow).join(''):'<div class="card muted small">Nessun concerto in Italia annunciato per ora.</div>'}}
 window.markAll=()=>{for(const k in S.seen)if(S.seen[k]==='new')S.seen[k]='old';save();render()};
 
 /* ---------- ARTISTI ---------- */
-function vArtists(app){const L=Object.values(S.artists).sort((a,b)=>sortName(a.name).localeCompare(sortName(b.name)));
-app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">I tuoi artisti</h1><div class="sub">${L.length} ${L.length===1?'artista':'artisti'}</div></div><div class="row"><button class="iconbtn" onclick="spLogin()" title="Importa da Spotify">${I.plus}</button></div></div>
-${L.length?(()=>{const G={};L.forEach(a=>(G[letterOf(a.name)]=G[letterOf(a.name)]||[]).push(a));return Object.keys(G).sort((a,b)=>a==='#'?-1:b==='#'?1:a.localeCompare(b)).map(l=>`<div class="dec" data-az="${l}" style="margin-right:22px">${l}</div><div class="grid" style="padding-right:22px">${G[l].map(a=>`<a class="av" style="width:auto" href="#artista/${a.mbid}">${avatar(a.name)}<div class="n">${esc(a.name)}</div></a>`).join('')}</div>`).join('')})():`<div class="card empty"><h3>Ancora nessun artista</h3><p>Importali da Spotify o cercali uno per uno.</p><div class="row" style="justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" onclick="spLogin()">Importa da Spotify</button><a class="btn ghost" href="#cerca">Cerca</a></div></div>`}`;
+let artMode='all';
+function vArtists(app){const ALL=Object.values(S.artists).sort((a,b)=>sortName(a.name).localeCompare(sortName(b.name)));const np=ALL.filter(a=>a.prio).length;const L=artMode==='prio'?ALL.filter(a=>a.prio):ALL;
+app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">I tuoi artisti</h1><div class="sub">${ALL.length} artisti · ${np} prioritari</div></div><div class="row"><button class="iconbtn" onclick="spLogin()" title="Importa da Spotify">${I.plus}</button></div></div>
+<div class="tabs">${[['all','Tutti'],['prio','★ Priorità '+np],['edit','Scegli priorità']].map(([k,l])=>`<button class="tab ${artMode===k?'on':''}" onclick="artMode='${k}';render()">${l}</button>`).join('')}</div>
+${artMode==='edit'?`<p class="small muted" style="margin:10px 0 0;line-height:1.5">Spunta i gruppi di cui vuoi sapere tutto per primo: compaiono in cima alla Home, con notifiche dedicate per ogni nuova uscita.</p>`:''}
+${L.length?(()=>{const G={};L.forEach(a=>(G[letterOf(a.name)]=G[letterOf(a.name)]||[]).push(a));return Object.keys(G).sort((a,b)=>a==='#'?-1:b==='#'?1:a.localeCompare(b)).map(l=>`<div class="dec" data-az="${l}" style="margin-right:22px">${l}</div><div class="grid" style="padding-right:22px;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:16px 12px">${G[l].map(a=>artMode==='edit'?`<button class="av" style="width:100%;min-width:0;display:block;position:relative" onclick="togglePrio('${a.mbid}');this.querySelector('.chk').classList.toggle('on');this.querySelector('.chk').innerHTML=S.artists['${a.mbid}'].prio?I.check:''">${avatar(a.name)}<div class="chk ${a.prio?'on':''}" style="position:absolute;top:2px;right:2px">${a.prio?I.check:''}</div><div class="n">${esc(a.name)}</div></button>`:`<a class="av" style="width:auto" href="#artista/${a.mbid}">${avatar(a.name,a.prio?'pic prio':'pic')}<div class="n">${a.prio?'<span class="prioStar">★</span> ':''}${esc(a.name)}</div></a>`).join('')}</div>`).join('')})():`<div class="card empty"><h3>Ancora nessun artista</h3><p>Importali da Spotify o cercali uno per uno.</p><div class="row" style="justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" onclick="spLogin()">Importa da Spotify</button><a class="btn ghost" href="#cerca">Cerca</a></div></div>`}`;
 app.querySelectorAll('.av .pic').forEach(p=>{p.style.width='100%';p.style.height='auto';p.style.aspectRatio='1'});setTimeout(attachIndex,0)}
 function addArtist(mbid,name,extra={}){if(S.artists[mbid])return;S.artists[mbid]={mbid,name,addedAt:Date.now(),...extra};save()}
 window.toggleFav=function(mbid,name){if(S.artists[mbid]){delete S.artists[mbid];toast('Tolto dai tuoi artisti')}else{addArtist(mbid,name);toast('Aggiunto ai tuoi artisti');discography(mbid).catch(()=>{})}save();
@@ -404,7 +431,7 @@ app.innerHTML=`<a class="iconbtn back" href="javascript:history.back()">${I.back
 <div style="margin-top:10px">${genres.map(g=>`<span class="chip">${esc(g)}</span>`).join('')}</div>
 <button class="iconbtn star" id="favb" style="width:48px;height:48px;color:var(--gold);background:var(--glass);backdrop-filter:blur(12px)" onclick="toggleFav('${mbid}',${esc(JSON.stringify(a.name))})">${fav?I.starF:I.starO}</button></div>
 <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:4px">
-<a class="btn sm" target="_blank" href="https://open.spotify.com/search/${enc(a.name)}">Ascolta su Spotify</a>
+${S.artists[mbid]?`<button class="btn sm ${S.artists[mbid].prio?'':'ghost'}" onclick="togglePrio('${mbid}');render()">${S.artists[mbid].prio?'★ Prioritario':'☆ Metti in priorità'}</button>`:''}<a class="btn sm" target="_blank" href="https://open.spotify.com/search/${enc(a.name)}">Ascolta su Spotify</a>
 <a class="btn sm ghost" target="_blank" href="https://www.setlist.fm/search?query=${enc(a.name)}">Scalette</a><a class="btn sm ghost" target="_blank" href="https://www.ticketone.it/search/?searchterm=${enc(a.name)}">TicketOne</a>
 ${site?`<a class="btn sm ghost" target="_blank" href="${esc(site.url.resource)}">Sito ufficiale</a>`:''}</div>
 <div class="tabs" id="atabs"></div><div id="abody">${loading}</div>`;
@@ -697,7 +724,7 @@ setTimeout(hide,4300)}
 /* ---------- avvio ---------- */
 applyTheme();intro();render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-(async()=>{await spCallback();if(K.gh){try{await syncNow()}catch(e){}}setTimeout(async()=>{await checkNews();checkGigs()},1500)})();
+(async()=>{await spCallback();if(K.gh){try{await syncNow()}catch(e){}}setTimeout(async()=>{await initPrio();await checkNews();checkGigs()},1500)})();
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(K.gh)syncNow().catch(()=>{});checkNews()}});
 </script>
 </body>
