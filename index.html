@@ -212,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.20';
+const VER='1.21';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -261,8 +261,10 @@ async function cached(key,ttl,fn){const c=await idb.get(key);if(c&&Date.now()-c.
 const mbQ=[];let mbBusy=false,mbLast=0;
 const mbUrl=p=>'https://musicbrainz.org/ws/2/'+p+(p.includes('?')?'&':'?')+'fmt=json';
 function mb(path,hi=true){return new Promise((res,rej)=>{const t={path,res,rej};hi?mbQ.unshift(t):mbQ.push(t);pump()})}
-async function pump(){if(mbBusy)return;mbBusy=true;while(mbQ.length){const t=mbQ.shift();const w=mbLast+1050-Date.now();if(w>0)await sleep(w);mbLast=Date.now();
-try{let r=await fetch(mbUrl(t.path));if(r.status===503||r.status===429){await sleep(1600);mbLast=Date.now();r=await fetch(mbUrl(t.path))}if(!r.ok)throw new Error('MusicBrainz '+r.status);t.res(await r.json())}catch(e){t.rej(e)}}mbBusy=false}
+let mbSlow=0;
+async function pump(){if(mbBusy)return;mbBusy=true;while(mbQ.length){const t=mbQ.shift();const gap=Date.now()<mbSlow?1800:1100;const w=mbLast+gap-Date.now();if(w>0)await sleep(w);mbLast=Date.now();
+try{let r;for(let k=0;k<5;k++){r=await fetch(mbUrl(t.path));if(r.status!==503&&r.status!==429)break;mbSlow=Date.now()+60e3;await sleep(1500*(k+1));mbLast=Date.now()}
+if(!r.ok)throw new Error('MusicBrainz '+r.status);t.res(await r.json())}catch(e){t.rej(e)}}mbBusy=false}
 const mbc=(path,ttl=7*DAY,hi=true)=>cached('mb:'+path,ttl,()=>mb(path,hi));
 
 /* ---------- Deezer (JSONP): foto artisti, copertine di riserva, anteprime ---------- */
@@ -276,7 +278,7 @@ const photoMem={};
 function artistPhoto(name){if(!name)return Promise.resolve('');if(photoMem[name])return photoMem[name];
 return photoMem[name]=(async()=>{const key='ph2:'+name;const c=await idb.get(key);if(c&&(c.v?Date.now()-c.t<30*DAY:Date.now()-c.t<2*DAY))return c.v;
 let u='';try{const d=await dz('search/artist?limit=8&q='+enc(name));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(name))||L.find(a=>norm(a.name).startsWith(norm(name)))||null;const x=m&&m.picture_xl;if(x&&!/\/artist\/\//.test(x))u=x}catch(e){if(c&&c.v)return c.v}
-if(!u){const a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));if(a){try{const j=await mbc(`artist/${a.mbid}?inc=url-rels`,30*DAY,false);const wd=(j.relations||[]).find(r=>r.type==='wikidata');if(wd){const w=await wikiInfo(wd.url.resource.split('/').pop());u=w.img||''}}catch(e){}}}
+if(!u&&mbQ.length<3){const a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));if(a){try{const j=await mbc(`artist/${a.mbid}?inc=url-rels`,30*DAY,false);const wd=(j.relations||[]).find(r=>r.type==='wikidata');if(wd){const w=await wikiInfo(wd.url.resource.split('/').pop());u=w.img||''}}catch(e){}}}
 await idb.set(key,{t:Date.now(),v:u});return u})().catch(()=>'')}
 function dzCover(artist,title){return cached('dzc:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/album?limit=5&q='+enc(`artist:"${artist}" album:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.cover_xl)||''}).catch(()=>'')}
 function dzPreview(artist,title){return cached('dzt:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/track?limit=5&q='+enc(`artist:"${artist}" track:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.preview)||''}).catch(()=>'')}
@@ -441,7 +443,7 @@ const b=$('#favb');if(b)b.innerHTML=S.artists[mbid]?I.starF:I.starO};
 
 /* ---------- SCHEDA ARTISTA ---------- */
 async function vArtist(app,mbid,ok){app.innerHTML=loading;let a;
-try{a=await mbc(`artist/${mbid}?inc=artist-rels+url-rels+genres+tags`,7*DAY)}catch(e){app.innerHTML=`<div class="empty"><h3>Non riesco a caricare l'artista</h3><p>${esc(e.message)}</p></div>`;return}if(!ok())return;
+try{a=await mbc(`artist/${mbid}?inc=artist-rels+url-rels+genres+tags`,7*DAY)}catch(e){app.innerHTML=`<div class="empty" style="padding-top:60px"><h3>L'archivio musicale è un po' affollato</h3><p>Riprovo da solo tra qualche secondo…</p><button class="btn" style="margin-top:14px" onclick="render()">Riprova ora</button></div>`;setTimeout(()=>{if(ok())render()},6000);return}if(!ok())return;
 const fav=!!S.artists[mbid];const ls=a['life-span']||{};const by=parseInt(ls.begin)||null;const ey=ls.ended?(parseInt(ls.end)||null):null;
 const genres=(a.genres&&a.genres.length?a.genres:(a.tags||[])).sort((x,y)=>y.count-x.count).slice(0,6).map(g=>g.name);
 const urls=(a.relations||[]).filter(r=>r['target-type']==='url');const wd=urls.find(r=>r.type==='wikidata');const qid=wd?wd.url.resource.split('/').pop():'';
@@ -513,7 +515,7 @@ function concertRow(c){const[y,m,d]=(c.date||'--').split('-');const nw=(S.seenGi
 
 /* ---------- SCHEDA ALBUM ---------- */
 async function vAlbum(app,rgid,ok){app.innerHTML=loading;let rg;
-try{rg=await mbc(`release-group/${rgid}?inc=releases+artist-credits+genres+tags`,7*DAY)}catch(e){app.innerHTML=`<div class="empty"><h3>Album non disponibile</h3><p>${esc(e.message)}</p></div>`;return}if(!ok())return;
+try{rg=await mbc(`release-group/${rgid}?inc=releases+artist-credits+genres+tags`,7*DAY)}catch(e){app.innerHTML=`<div class="empty" style="padding-top:60px"><h3>L'archivio musicale è un po' affollato</h3><p>Riprovo da solo tra qualche secondo…</p><button class="btn" style="margin-top:14px" onclick="render()">Riprova ora</button></div>`;setTimeout(()=>{if(ok())render()},6000);return}if(!ok())return;
 if(S.seen[rgid]==='new'){S.seen[rgid]='old';save()}
 if(S.albums[rgid]&&(!S.albums[rgid].lo||Date.now()-S.albums[rgid].lo>DAY)){S.albums[rgid].lo=Date.now();save()}
 const artist=(rg['artist-credit']||[]).map(c=>c.name+(c.joinphrase||'')).join('')||'';const aid=rg['artist-credit']?.[0]?.artist?.id;
