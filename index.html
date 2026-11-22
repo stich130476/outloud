@@ -212,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.21';
+const VER='1.22';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -653,7 +653,7 @@ const redirectUri=()=>location.origin+location.pathname;
 const b64url=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 window.spLogin=async function(){if(!S.settings.sp){toast('Inserisci prima il Client ID di Spotify');go('impostazioni');return}
 const v=b64url(crypto.getRandomValues(new Uint8Array(48)));localStorage.setItem('ol-pkce',v);const ch=b64url(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));
-location.href='https://accounts.spotify.com/authorize?'+new URLSearchParams({client_id:S.settings.sp,response_type:'code',redirect_uri:redirectUri(),code_challenge_method:'S256',code_challenge:ch,scope:'user-follow-read user-top-read user-library-read'})};
+location.href='https://accounts.spotify.com/authorize?'+new URLSearchParams({client_id:S.settings.sp,response_type:'code',redirect_uri:redirectUri(),code_challenge_method:'S256',code_challenge:ch,scope:'user-follow-read user-top-read user-library-read playlist-read-private playlist-read-collaborative'})};
 async function spCallback(){const p=new URLSearchParams(location.search);const code=p.get('code'),err=p.get('error');if(!code&&!err)return;history.replaceState(null,'',location.pathname+location.hash);
 if(err){toast('Accesso a Spotify annullato');return}
 try{const r=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:redirectUri(),client_id:S.settings.sp,code_verifier:localStorage.getItem('ol-pkce')||''})});
@@ -663,7 +663,8 @@ const C={};const add=(a,tag)=>{if(!a||!a.id)return;const c=C[a.id]||(C[a.id]={id
 try{let u='https://api.spotify.com/v1/me/following?type=artist&limit=50';while(u){const j=await get(u);(j.artists.items||[]).forEach(a=>add(a,'Segui'));u=j.artists.next}}catch(e){}
 for(const tr of['short_term','medium_term','long_term']){try{const j=await get(`https://api.spotify.com/v1/me/top/artists?limit=50&time_range=${tr}`);(j.items||[]).forEach(a=>add(a,'Più ascoltato'))}catch(e){}}
 try{let u='https://api.spotify.com/v1/me/albums?limit=50',n=0;while(u&&n<6){const j=await get(u);(j.items||[]).forEach(x=>(x.album?.artists||[]).forEach(a=>add(a,'Album salvati')));u=j.next;n++}}catch(e){}
-await spWrapped(get).catch(()=>{});
+spWr=[];spWrErr=[];await spWrapped(get).catch(e=>spWrErr.push('elenco playlist ('+e.message+')'));
+setTimeout(()=>toast(spWr.length?`🎁 Wrapped importati: ${spWr.sort().join(', ')}`:spWrErr.length?`Wrapped non letti: ${spWrErr.join(', ')}`:'Nessuna playlist “Wrapped + anno” trovata'),900);
 const L=Object.values(C).filter(c=>!Object.values(S.artists).some(x=>x.spotifyId===c.id)).sort((a,b)=>b.tags.size-a.tags.size||a.name.localeCompare(b.name));
 if(!L.length){s.querySelector('.in').innerHTML='<h2>Nessun nuovo artista</h2><p class="muted">Spotify non ha restituito artisti nuovi da importare.</p><button class="btn" onclick="this.closest(\'.sheet\').remove()">Chiudi</button>';return}
 const sel=new Set(L.filter(c=>c.tags.has('Segui')||c.tags.has('Più ascoltato')).map(c=>c.id));
@@ -682,8 +683,9 @@ async function spWrapped(get){let u='https://api.spotify.com/v1/me/playlists?lim
 while(u&&n<10){const j=await get(u);for(const p of j.items||[]){if(!p)continue;const m=(p.name||'').match(/(top songs|brani preferiti|canzoni preferite|wrapped)\D*((19|20)\d\d)/i);if(!m)continue;const y=m[2];
 let items=[];for(const ep of['items','tracks']){try{const k=await get(`https://api.spotify.com/v1/playlists/${p.id}/${ep}?limit=100`);items=k.items||[];break}catch(e){}}
 const tr=items.map(x=>x.item||x.track).filter(Boolean).map(t=>({t:t.name,a:(t.artists||[]).map(a=>a.name).join(', '),al:t.album?.name||''}));
-if(tr.length){const w=S.wrapped[y]||(S.wrapped[y]={});w.pl=tr;w.plName=p.name;found++}}u=j.next;n++}
+if(tr.length){const w=S.wrapped[y]||(S.wrapped[y]={});w.pl=tr;w.plName=p.name;w.u=Date.now();found++;spWr.push(y)}else spWrErr.push(p.name)}u=j.next;n++}
 if(found)save();return found}
+let spWr=[],spWrErr=[];
 /* Cronologia completa dall'esportazione dati di Spotify */
 window.importHistory=async function(inp){const files=[...inp.files];if(!files.length)return;toast('Analizzo la cronologia…');const Y={};let rows=0;
 for(const f of files){let d;try{d=JSON.parse(await f.text())}catch(e){continue}if(!Array.isArray(d))continue;
