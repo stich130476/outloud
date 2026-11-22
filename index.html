@@ -217,7 +217,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.24';
+const VER='1.25';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -693,7 +693,7 @@ s.remove();toast(`${pick.length-miss.length} artisti aggiunti`);if(miss.length)s
 go('home');render();checkNews(true)}};draw()}
 /* Wrapped: playlist "I tuoi brani preferiti del ANNO" salvate nella libreria */
 async function spWrapped(get){let u='https://api.spotify.com/v1/me/playlists?limit=50',n=0,found=0;S.wrapped=S.wrapped||{};
-while(u&&n<10){const j=await get(u);for(const p of j.items||[]){if(!p)continue;const m=(p.name||'').match(/(top songs|brani preferiti|canzoni preferite|wrapped)\D*((19|20)\d\d)/i);if(!m)continue;const y=m[2];
+while(u&&n<10){const j=await get(u);for(const p of j.items||[]){if(!p)continue;let m=(p.name||'').match(/(top songs|brani preferiti|canzoni preferite|wrapped)\D*((19|20)\d\d)/i);let y;if(m)y=m[2];else if(/(wrapped|top songs|brani preferiti|canzoni preferite)/i.test(p.name||'')&&!/(19|20)\d\d/.test(p.name||''))y=String(new Date().getFullYear());else continue;
 let items=[];for(const ep of['items','tracks']){try{const k=await get(`https://api.spotify.com/v1/playlists/${p.id}/${ep}?limit=100`);items=k.items||[];break}catch(e){}}
 const tr=items.map(x=>x.item||x.track).filter(Boolean).map(t=>({t:t.name,a:(t.artists||[]).map(a=>a.name).join(', '),al:t.album?.name||'',img:(t.album?.images||[]).slice(-2)[0]?.url||''}));
 if(tr.length){const w=S.wrapped[y]||(S.wrapped[y]={});w.pl=tr;w.plName=p.name;w.u=Date.now();found++;spWr.push(y)}else spWrErr.push(p.name)}u=j.next;n++}
