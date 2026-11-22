@@ -212,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.15';
+const VER='1.16';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -721,13 +721,26 @@ app.innerHTML=`<a class="iconbtn back" href="#home">${I.back}</a><div style="pad
 <div class="field"><label>Utente GitHub</label><input id="ghu" value="${esc(K.ghUser)}"></div><div class="field"><label>Repository privato</label><input id="ghr" value="${esc(K.ghRepo)}"></div><div class="field"><label>Token</label><input id="ght" type="password" value="${esc(K.gh)}" placeholder="github_pat_…"></div>
 <button class="btn sm" onclick="saveSet();doSync()">Salva e sincronizza</button></div>
 <div class="card" style="margin-top:14px"><h3 style="font-size:19px">Notifiche e aspetto</h3>
-<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">${perm==='granted'?'<span class="pill">Notifiche attive ✓</span>':perm==='unsupported'?'<span class="pill">Aggiungi l\'app alla Home per le notifiche</span>':'<button class="btn sm" onclick="askNotif()">Attiva le notifiche</button>'}
+<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">${!('PushManager'in window)?'<span class="pill">Apri OutLoud! dall\'icona sulla Home per le notifiche</span>':(perm==='granted'&&K.pushOn)?'<span class="pill">🔔 Attive anche ad app chiusa ✓</span> <button class="btn sm ghost" onclick="askNotif()">Riattiva</button>':'<button class="btn sm" onclick="askNotif()">🔔 Attiva le notifiche</button>'}</div><p class="small muted" style="line-height:1.5;margin:10px 0 0">Nuovi dischi, singoli e raccolte, e concerti in Italia: due controlli al giorno (verso le 8 e le 18), anche ad app chiusa. Per i gruppi prioritari una notifica per ogni uscita.</p><div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">
 <div class="tabs" style="margin:4px 0;flex-basis:100%">${[['dark','Sera'],['day','Giorno'],['auto','Automatico']].map(([k,l])=>`<button class="tab ${K.theme===k?'on':''}" onclick="setTheme('${k}')">${l}</button>`).join('')}</div><button class="btn sm ghost" onclick="checkNews(true);go('home')">Controlla novità ora</button></div></div>
 <div class="card" style="margin-top:14px"><h3 style="font-size:19px">Backup</h3><div class="row" style="gap:8px;margin-top:10px"><button class="btn sm ghost" onclick="exportData()">Esporta</button><label class="btn sm ghost">Importa<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label></div></div>
 <div class="sign">OutLoud! ${VER}<br>Stefano Fasolato 🖤💙</div></div>`}
 window.saveSet=()=>{S.settings.sp=$('#sp').value.trim();S.settings.tm=$('#tm').value.trim();K.ghUser=$('#ghu').value.trim()||OWNER_DEFAULT;K.ghRepo=$('#ghr').value.trim()||'outloud-dati';K.gh=$('#ght').value.trim();saveKeys();save(false,false)};
 window.doSync=async()=>{if(!K.gh)return toast('Inserisci il token');try{const r=await syncNow();toast(r==='pulled'?'Dati scaricati da GitHub':r==='pushed'?'Dati salvati su GitHub':'Già allineato')}catch(e){toast('Errore: '+e.message)}};
-window.askNotif=async()=>{try{const p=await Notification.requestPermission();toast(p==='granted'?'Notifiche attive':'Notifiche non consentite');render()}catch(e){}};
+const VAPID='BP94QoFVHO0nUnKtTUGKI0nVdN95HYz9xjON5Cs-rGJEqscO7TQ32umJ4hRK_hClpVincDoO3zmeFq34pRWehJk';
+const devName=()=>/iPad/.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent))?'iPad':/iPhone/.test(navigator.userAgent)?'iPhone':'computer';
+const b64u=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));
+window.askNotif=async()=>{try{
+if(!('serviceWorker'in navigator)||!('PushManager'in window))return toast("Apri OutLoud! dall'icona sulla Home");
+if(!K.gh)return toast('Prima attiva la sincronizzazione qui sotto');
+const p=await Notification.requestPermission();if(p!=='granted')return toast('Permesso non concesso');
+const reg=await navigator.serviceWorker.ready;const sub=(await reg.pushManager.getSubscription())||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID)});
+K.devId=K.devId||devName().toLowerCase()+'-'+Math.random().toString(36).slice(2,8);saveKeys();
+const url=`https://api.github.com/repos/${K.ghUser}/${K.ghRepo}/contents/push.json`;let sha,cur={subs:{}};
+const g=await fetch(url+'?t='+Date.now(),{headers:ghH(),cache:'no-store'});if(g.ok){const j=await g.json();sha=j.sha;try{cur=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g,'')),c=>c.charCodeAt(0))))}catch(e){}}
+cur.subs=cur.subs||{};cur.subs[K.devId]={name:devName(),at:Date.now(),sub:sub.toJSON()};
+const r=await fetch(url,{method:'PUT',headers:ghH(),body:JSON.stringify({message:'OutLoud!: notifiche attivate su '+devName(),content:btoa(unescape(encodeURIComponent(JSON.stringify(cur,null,1)))),...(sha?{sha}:{})})});
+if(!r.ok)throw new Error('GitHub '+r.status);K.pushOn=1;saveKeys();render();toast('🔔 Attivate! Tra qualche minuto arriva la notifica di benvenuto')}catch(e){toast('Non riesco ad attivarle: '+e.message)}};
 window.setTheme=t=>{K.theme=t;saveKeys();applyTheme();render()};
 const mqDark=matchMedia('(prefers-color-scheme: dark)');mqDark.addEventListener?.('change',()=>{if(K.theme==='auto')applyTheme()});
 function isDay(){return K.theme==='day'||(K.theme==='auto'&&!mqDark.matches)}
