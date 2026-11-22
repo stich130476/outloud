@@ -212,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.16';
+const VER='1.17';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -249,7 +249,7 @@ let S;try{S=Object.assign(blank(),JSON.parse(localStorage.getItem(LS)||'{}'))}ca
 let K;try{K=Object.assign({gh:'',ghUser:OWNER_DEFAULT,ghRepo:'outloud-dati',theme:'dark'},JSON.parse(localStorage.getItem(LK)||'{}'))}catch(e){K={gh:'',ghUser:OWNER_DEFAULT,ghRepo:'outloud-dati',theme:'dark'}}
 function saveKeys(){localStorage.setItem(LK,JSON.stringify(K))}
 let pushT;
-function save(sync=true,bump=true){if(bump)S.updatedAt=Date.now();localStorage.setItem(LS,JSON.stringify(S));if(sync&&K.gh){clearTimeout(pushT);pushT=setTimeout(()=>syncNow(true).catch(()=>{}),2500)}}
+function save(sync=true,bump=true){if(bump)S.updatedAt=Date.now();localStorage.setItem(LS,JSON.stringify(S));if(sync&&K.gh){clearTimeout(pushT);pushT=setTimeout(()=>syncNow().catch(()=>{}),2500)}}
 
 /* ---------- cache (IndexedDB) ---------- */
 const idb=(()=>{let p;const db=()=>p||(p=new Promise((res,rej)=>{const r=indexedDB.open('outloud',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
@@ -305,8 +305,8 @@ await idb.set(key,{t:Date.now(),v:out});return out}
 let checking=null;
 const PRIO_INIT=['The Smashing Pumpkins','Radiohead','Ministri','Foo Fighters','Calcutta','Blur','Silversun Pickups','The Zen Circus'];
 const isPrio=id=>!!(S.artists[id]&&S.artists[id].prio);
-window.togglePrio=function(id){const a=S.artists[id];if(!a)return;a.prio=!a.prio;save();toast(a.prio?`★ ${a.name} tra le priorità`:`${a.name} tolto dalle priorità`);return a.prio};
-async function initPrio(){S.prioDone=S.prioDone||[];const todo=PRIO_INIT.filter(n=>!S.prioDone.includes(n));if(!todo.length)return;S.prioDone.push(...todo);save();
+window.togglePrio=function(id){const a=S.artists[id];if(!a)return;a.prio=!a.prio;a.u=Date.now();save();toast(a.prio?`★ ${a.name} tra le priorità`:`${a.name} tolto dalle priorità`);return a.prio};
+async function initPrio(){if(!K.synced&&!Object.keys(S.artists).length)return;if(K.gh&&!K.synced)return;S.prioDone=S.prioDone||[];const todo=PRIO_INIT.filter(n=>!S.prioDone.includes(n));if(!todo.length)return;S.prioDone.push(...todo);save();
 for(const name of todo){let a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));
 if(!a){try{const j=await mb(`artist?query=${enc('artist:"'+name+'"')}&limit=5`,false);const m=(j.artists||[]).find(x=>norm(x.name)===norm(name)&&x.score>=90);if(m){addArtist(m.id,m.name);a=S.artists[m.id];discography(m.id,false).catch(()=>{})}}catch(e){}}
 if(a)a.prio=true}save();if(route().v==='home'||route().v==='artisti')render()}
@@ -427,8 +427,9 @@ app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">I tuoi artisti</
 ${artMode==='edit'?`<p class="small muted" style="margin:10px 0 0;line-height:1.5">Spunta i gruppi di cui vuoi sapere tutto per primo: compaiono in cima alla Home, con notifiche dedicate per ogni nuova uscita.</p>`:''}
 ${L.length?(()=>{const G={};L.forEach(a=>(G[letterOf(a.name)]=G[letterOf(a.name)]||[]).push(a));return Object.keys(G).sort((a,b)=>a==='#'?-1:b==='#'?1:a.localeCompare(b)).map(l=>`<div class="dec" data-az="${l}" style="margin-right:22px">${l}</div><div class="grid" style="padding-right:22px;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:16px 12px">${G[l].map(a=>artMode==='edit'?`<button class="av" style="width:100%;min-width:0;display:block;position:relative" onclick="togglePrio('${a.mbid}');this.querySelector('.chk').classList.toggle('on');this.querySelector('.chk').innerHTML=S.artists['${a.mbid}'].prio?I.check:''">${avatar(a.name)}<div class="chk ${a.prio?'on':''}" style="position:absolute;top:2px;right:2px">${a.prio?I.check:''}</div><div class="n">${esc(a.name)}</div></button>`:`<a class="av" style="width:auto" href="#artista/${a.mbid}">${avatar(a.name,a.prio?'pic prio':'pic')}<div class="n">${a.prio?'<span class="prioStar">★</span> ':''}${esc(a.name)}</div></a>`).join('')}</div>`).join('')})():`<div class="card empty"><h3>Ancora nessun artista</h3><p>Importali da Spotify o cercali uno per uno.</p><div class="row" style="justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" onclick="spLogin()">Importa da Spotify</button><a class="btn ghost" href="#cerca">Cerca</a></div></div>`}`;
 app.querySelectorAll('.av .pic').forEach(p=>{p.style.width='100%';p.style.height='auto';p.style.aspectRatio='1'});setTimeout(attachIndex,0)}
-function addArtist(mbid,name,extra={}){if(S.artists[mbid])return;S.artists[mbid]={mbid,name,addedAt:Date.now(),...extra};save()}
-window.toggleFav=function(mbid,name){if(S.artists[mbid]){delete S.artists[mbid];toast('Tolto dai tuoi artisti')}else{addArtist(mbid,name);toast('Aggiunto ai tuoi artisti');discography(mbid).catch(()=>{})}save();
+function addArtist(mbid,name,extra={}){if(S.artists[mbid])return;S.artists[mbid]={mbid,name,addedAt:Date.now(),u:Date.now(),...extra};if(S.del)delete S.del['a:'+mbid];save()}
+function tomb(k){S.del=S.del||{};S.del[k]=Date.now()}
+window.toggleFav=function(mbid,name){if(S.artists[mbid]){delete S.artists[mbid];tomb('a:'+mbid);toast('Tolto dai tuoi artisti')}else{addArtist(mbid,name);toast('Aggiunto ai tuoi artisti');discography(mbid).catch(()=>{})}save();
 const b=$('#favb');if(b)b.innerHTML=S.artists[mbid]?I.starF:I.starO};
 
 /* ---------- SCHEDA ARTISTA ---------- */
@@ -541,7 +542,7 @@ if(eds.length>1){const lab=e=>`${e.dis?e.dis.charAt(0).toUpperCase()+e.dis.slice
 $('#ed').innerHTML=`<div class="field" style="margin-bottom:6px"><label>Edizione${mineRel?' · <span style="color:var(--gold)">la tua</span>':''}</label><select id="edsel">${eds.map(e=>`<option value="${e.id}" ${e.id===cur?'selected':''}>${esc(lab(e))}</option>`).join('')}</select></div>`;
 $('#edsel').onchange=e=>{setAlb(rgid,{rel:e.target.value},rg,artist,aid);loadRel(e.target.value);toast('Edizione salvata')}}
 loadRel(cur)}
-function setAlb(id,patch,rg,artist,aid){const cur=S.albums[id]||{t:rg.title,a:artist,aid,d:rg['first-release-date']||''};Object.assign(cur,patch);if(!cur.cd&&!cur.r&&!cur.n&&!cur.rel)delete S.albums[id];else S.albums[id]=cur;save()}
+function setAlb(id,patch,rg,artist,aid){const cur=S.albums[id]||{t:rg.title,a:artist,aid,d:rg['first-release-date']||''};Object.assign(cur,patch);cur.u=Date.now();if(!cur.cd&&!cur.r&&!cur.n&&!cur.rel){delete S.albums[id];tomb('b:'+id)}else{S.albums[id]=cur;if(S.del)delete S.del['b:'+id]}save()}
 
 /* ---------- RICERCA ---------- */
 let sq='',sk='artist';
@@ -581,9 +582,9 @@ const s=sheet(`<h2 style="margin-bottom:14px">${id?'Modifica concerto':'Nuovo co
 <div class="field"><label>Locale</label><input id="dv" value="${esc(c.venue)}"></div>
 <div class="field"><label>Un ricordo</label><textarea id="dn" rows="2">${esc(c.note)}</textarea></div>
 <div class="row" style="gap:10px"><button class="btn" id="dsave">Salva</button>${id?'<button class="btn ghost" id="ddel" style="color:var(--red)">Elimina</button>':''}</div>`);
-$('#dsave',s).onclick=()=>{const v={id:id||'c'+Date.now(),artist:$('#da',s).value.trim(),date:$('#dd',s).value,city:$('#dc',s).value.trim(),venue:$('#dv',s).value.trim(),note:$('#dn',s).value.trim()};if(!v.artist||!v.date)return toast('Servono artista e data');
+$('#dsave',s).onclick=()=>{const v={u:Date.now(),id:id||'c'+Date.now(),artist:$('#da',s).value.trim(),date:$('#dd',s).value,city:$('#dc',s).value.trim(),venue:$('#dv',s).value.trim(),note:$('#dn',s).value.trim()};if(!v.artist||!v.date)return toast('Servono artista e data');
 S.diary=S.diary.filter(x=>x.id!==v.id);S.diary.push(v);save();s.remove();ctab='d';render()};
-if(id)$('#ddel',s).onclick=()=>{S.diary=S.diary.filter(x=>x.id!==id);save();s.remove();render()}};
+if(id)$('#ddel',s).onclick=()=>{S.diary=S.diary.filter(x=>x.id!==id);tomb('c:'+id);save();s.remove();render()}};
 
 /* ---------- COLLEZIONE ---------- */
 let coltab='cd';
@@ -603,7 +604,7 @@ window.addCdList=function(){const s=sheet(`<h2 style="margin-bottom:8px">Aggiung
 $('#cdgo',s).onclick=async()=>{const lines=$('#cdl',s).value.split('\n').map(x=>x.trim()).filter(Boolean);if(!lines.length)return;const ok=[],miss=[];let i=0;
 for(const ln of lines){i++;const m=ln.split(/\s+[-–—]\s+/);const a=(m[0]||'').trim(),t=m.slice(1).join(' - ').trim();s.querySelector('.in').innerHTML=`<h2>Cerco i tuoi CD</h2><p class="muted">${i} di ${lines.length}: ${esc(ln)}</p><div class="load"><div class="spin"></div></div>`;
 if(!a||!t){miss.push(ln);continue}try{const j=await mb(`release-group?query=${enc(`releasegroup:"${t}" AND artist:"${a}"`)}&limit=5`);const L=(j['release-groups']||[]).filter(r=>r.score>=75);const r=L.find(x=>norm(x.title)===norm(t))||L[0];
-if(r){const ar=(r['artist-credit']||[]).map(c=>c.name+(c.joinphrase||'')).join('');const cur=S.albums[r.id]||{t:r.title,a:ar,aid:r['artist-credit']?.[0]?.artist?.id,d:r['first-release-date']||''};cur.cd=true;S.albums[r.id]=cur;ok.push(ar+' – '+r.title)}else miss.push(ln)}catch(e){miss.push(ln)}}
+if(r){const ar=(r['artist-credit']||[]).map(c=>c.name+(c.joinphrase||'')).join('');const cur=S.albums[r.id]||{t:r.title,a:ar,aid:r['artist-credit']?.[0]?.artist?.id,d:r['first-release-date']||''};cur.cd=true;cur.u=Date.now();S.albums[r.id]=cur;if(S.del)delete S.del['b:'+r.id];ok.push(ar+' – '+r.title)}else miss.push(ln)}catch(e){miss.push(ln)}}
 save();s.querySelector('.in').innerHTML=`<h2>Fatto!</h2><p>${ok.length} CD aggiunti alla mensola.</p>${miss.length?`<p class="small muted" style="margin-top:14px">Non trovati (${miss.length}): cercali a mano o correggi il nome.</p>${miss.map(x=>`<div class="li"><div class="tx"><b>${esc(x)}</b></div></div>`).join('')}`:''}<button class="btn" style="margin-top:14px" onclick="this.closest('.sheet').remove();render()">Chiudi</button>`}};
 function letterOf(n){const c=sortName(n).normalize('NFD').replace(/[\u0300-\u036f]/g,'').charAt(0).toUpperCase();return /[A-Z]/.test(c)?c:'#'}
 function attachIndex(){document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove());const marks=[...document.querySelectorAll('[data-az]')];if(marks.length<8)return;
@@ -703,13 +704,22 @@ const bin=atob(j.content.replace(/\n/g,''));const txt=new TextDecoder().decode(U
 async function ghPut(sha){const bytes=new TextEncoder().encode(JSON.stringify(S));let bin='';for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
 const r=await fetch(ghU(),{method:'PUT',headers:ghH(),body:JSON.stringify({message:'OutLoud! sync',content:btoa(bin),...(sha?{sha}:{})})});if(!r.ok)throw new Error('GitHub '+r.status)}
 let syncing=false;
-async function syncNow(pushOnly=false){if(!K.gh||syncing)return;syncing=true;try{const{data,sha}=await ghGet();
-const localEmpty=!Object.keys(S.artists).length&&!Object.keys(S.albums).length&&!S.diary.length;
-if(data&&localEmpty&&Object.keys(data.artists||{}).length){S=Object.assign(blank(),data);localStorage.setItem(LS,JSON.stringify(S));render();return'pulled'}
-const remoteEmpty=!data||(!Object.keys(data.artists||{}).length&&!Object.keys(data.albums||{}).length&&!(data.diary||[]).length);
-if(!localEmpty&&remoteEmpty){S.updatedAt=Date.now();localStorage.setItem(LS,JSON.stringify(S));await ghPut(sha);return'pushed'}
-if(data&&!pushOnly&&(data.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(blank(),data);localStorage.setItem(LS,JSON.stringify(S));render();return'pulled'}
-if(!data||(S.updatedAt||0)>(data.updatedAt||0)){if(data&&localEmpty)return'same';await ghPut(sha);return'pushed'}return'same'}finally{syncing=false}}
+function mergeState(L,R){if(!R)return L;const out=Object.assign(blank(),R,L);const del=Object.assign({},R.del||{},L.del||{});
+for(const k in del){const o=(L.del||{})[k]||0,r=(R.del||{})[k]||0;del[k]=Math.max(o,r)}
+const mm=(a,b,pre)=>{const o={};for(const k of new Set([...Object.keys(a||{}),...Object.keys(b||{})])){const x=(a||{})[k],y=(b||{})[k];const w=!x?y:!y?x:((x.u||0)>=(y.u||0)?x:y);if(del[pre+k]&&del[pre+k]>(w.u||w.addedAt||0))continue;o[k]=w}return o};
+out.artists=mm(L.artists,R.artists,'a:');out.albums=mm(L.albums,R.albums,'b:');
+const dm={};[...(R.diary||[]),...(L.diary||[])].forEach(c=>{const p=dm[c.id];if(!p||(c.u||0)>=(p.u||0))dm[c.id]=c});out.diary=Object.values(dm).filter(c=>!(del['c:'+c.id]&&del['c:'+c.id]>(c.u||0)));
+out.seen=Object.assign({},R.seen||{},L.seen||{});for(const k in out.seen)if((R.seen||{})[k]==='old'||(L.seen||{})[k]==='old')out.seen[k]='old';
+out.seenGigs=Object.assign({},R.seenGigs||{},L.seenGigs||{});out.wrapped=Object.assign({},R.wrapped||{},L.wrapped||{});
+out.prioDone=[...new Set([...(R.prioDone||[]),...(L.prioDone||[])])];
+const sl=L.settings||{},sr=R.settings||{};out.settings={sp:sl.sp||sr.sp||'',tm:sl.tm||sr.tm||''};
+out.lastCheck=Math.max(L.lastCheck||0,R.lastCheck||0);out.lastGigs=Math.max(L.lastGigs||0,R.lastGigs||0);out.del=del;out.updatedAt=Math.max(L.updatedAt||0,R.updatedAt||0);return out}
+async function syncNow(){if(!K.gh||syncing)return;syncing=true;try{const{data,sha}=await ghGet();
+const before=JSON.stringify(S);const M=mergeState(S,data);const changedLocal=JSON.stringify(M)!==before;
+S=M;localStorage.setItem(LS,JSON.stringify(S));
+const strip=x=>{const c=Object.assign({},x);delete c.updatedAt;return JSON.stringify(c)};
+if(!data||strip(M)!==strip(Object.assign(blank(),data))){S.updatedAt=Date.now();localStorage.setItem(LS,JSON.stringify(S));await ghPut(sha)}
+if(changedLocal)render();K.synced=1;saveKeys();return changedLocal?'pulled':'pushed'}finally{syncing=false}}
 
 /* ---------- IMPOSTAZIONI ---------- */
 function vSettings(app){const perm='Notification'in window?Notification.permission:'unsupported';
