@@ -212,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.19';
+const VER='1.20';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -266,13 +266,18 @@ try{let r=await fetch(mbUrl(t.path));if(r.status===503||r.status===429){await sl
 const mbc=(path,ttl=7*DAY,hi=true)=>cached('mb:'+path,ttl,()=>mb(path,hi));
 
 /* ---------- Deezer (JSONP): foto artisti, copertine di riserva, anteprime ---------- */
-let dzN=0;
-function dz(path){return new Promise((res,rej)=>{const cb='__dz'+(++dzN);const s=document.createElement('script');const to=setTimeout(()=>{clean();rej(new Error('timeout'))},9000);
-function clean(){clearTimeout(to);delete window[cb];s.remove()}window[cb]=d=>{clean();res(d)};s.onerror=()=>{clean();rej(new Error('deezer'))};
+let dzN=0,dzLast=0,dzChain=Promise.resolve();
+function dzRaw(path){return new Promise((res,rej)=>{const cb='__dz'+(++dzN);const s=document.createElement('script');const to=setTimeout(()=>{clean();rej(new Error('timeout'))},9000);
+function clean(){clearTimeout(to);delete window[cb];s.remove()}window[cb]=d=>{clean();if(d&&d.error)rej(new Error('deezer '+(d.error.code||'')));else res(d)};s.onerror=()=>{clean();rej(new Error('deezer'))};
 s.src='https://api.deezer.com/'+path+(path.includes('?')?'&':'?')+'output=jsonp&callback='+cb;document.head.appendChild(s)})}
+/* Deezer accetta circa 50 richieste ogni 5 secondi: le metto in fila (8 al secondo) e riprovo se è occupato */
+function dz(path){const p=dzChain.then(async()=>{const w=dzLast+125-Date.now();if(w>0)await sleep(w);dzLast=Date.now()}).then(async()=>{for(let t=0;t<3;t++){try{return await dzRaw(path)}catch(e){if(t===2)throw e;await sleep(1500*(t+1))}}});dzChain=p.catch(()=>{});return p}
 const photoMem={};
 function artistPhoto(name){if(!name)return Promise.resolve('');if(photoMem[name])return photoMem[name];
-return photoMem[name]=cached('dzp:'+name,30*DAY,async()=>{const d=await dz('search/artist?limit=6&q='+enc(name));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(name))||L[0];const u=m&&m.picture_xl;return u&&!/\/artist\/\//.test(u)?u:''}).catch(()=>'')}
+return photoMem[name]=(async()=>{const key='ph2:'+name;const c=await idb.get(key);if(c&&(c.v?Date.now()-c.t<30*DAY:Date.now()-c.t<2*DAY))return c.v;
+let u='';try{const d=await dz('search/artist?limit=8&q='+enc(name));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(name))||L.find(a=>norm(a.name).startsWith(norm(name)))||null;const x=m&&m.picture_xl;if(x&&!/\/artist\/\//.test(x))u=x}catch(e){if(c&&c.v)return c.v}
+if(!u){const a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));if(a){try{const j=await mbc(`artist/${a.mbid}?inc=url-rels`,30*DAY,false);const wd=(j.relations||[]).find(r=>r.type==='wikidata');if(wd){const w=await wikiInfo(wd.url.resource.split('/').pop());u=w.img||''}}catch(e){}}}
+await idb.set(key,{t:Date.now(),v:u});return u})().catch(()=>'')}
 function dzCover(artist,title){return cached('dzc:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/album?limit=5&q='+enc(`artist:"${artist}" album:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.cover_xl)||''}).catch(()=>'')}
 function dzPreview(artist,title){return cached('dzt:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/track?limit=5&q='+enc(`artist:"${artist}" track:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.preview)||''}).catch(()=>'')}
 
