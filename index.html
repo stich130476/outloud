@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="OutLoud!">
 <meta name="theme-color" content="#0a0a0d">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+<link rel="icon" href="icon-192.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -212,7 +212,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.14';
+const VER='1.15';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -348,7 +348,13 @@ const img=e.claims?.P18?.[0]?.mainsnak?.datavalue?.value||'';let text='';
 if(title){const w=await (await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&redirects=1&format=json&origin=*&titles=${enc(title)}`)).json();const pg=Object.values(w.query.pages)[0];text=pg.extract||''}
 return{lang,title,img:img?`https://commons.wikimedia.org/wiki/Special:FilePath/${enc(img)}?width=1000`:'',text}})}
 
-function topTracks(name){return cached('dztop:'+name,7*DAY,async()=>{const d=await dz('search/artist?limit=6&q='+enc(name));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(name))||L[0];if(!m)return[];
+function dzArtistId(name){return cached('dzid:'+name,30*DAY,async()=>{const d=await dz('search/artist?limit=6&q='+enc(name));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(name))||L[0];return m?m.id:0}).catch(()=>0)}
+function similarArtists(name){return cached('dzsim:'+name,14*DAY,async()=>{const id=await dzArtistId(name);if(!id)return[];const d=await dz(`artist/${id}/related?limit=15`);return((d&&d.data)||[]).map(a=>({name:a.name,img:a.picture_medium||''}))}).catch(()=>[])}
+window.openArtist=async function(name){toast('Apro '+name+'…');try{const j=await mb(`artist?query=${enc('artist:"'+name+'"')}&limit=5`);const a=(j.artists||[]).find(x=>norm(x.name)===norm(name))||(j.artists||[])[0];if(a)go('artista/'+a.id);else toast('Artista non trovato')}catch(e){toast('Riprova tra un attimo')}};
+function dayHash(str){let h=0;for(const c of str)h=(h*131+c.charCodeAt(0))>>>0;return h}
+function weekKey(){const d=new Date();const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-dn+3);const y=t.getUTCFullYear();return y+'-'+Math.ceil(((t-Date.UTC(y,0,1))/DAY+1)/7)}
+async function albumStory(id){return cached('story:'+id,30*DAY,async()=>{const rg=await mb(`release-group/${id}?inc=url-rels`);const wd=(rg.relations||[]).find(r=>r.type==='wikidata');if(!wd)return'';const w=await wikiInfo(wd.url.resource.split('/').pop());return(w.text||'').split('\n').find(x=>x.trim().length>60)||''}).catch(()=>'')}
+function topTracks(name){return cached('dztop:'+name,7*DAY,async()=>{const id=await dzArtistId(name);const m=id?{id}:null;if(!m)return[];
 const t=await dz(`artist/${m.id}/top?limit=20`);return((t&&t.data)||[]).map(x=>({t:x.title_short||x.title,album:x.album?.title||'',cover:x.album?.cover_medium||'',prev:x.preview||'',dur:x.duration?`${Math.floor(x.duration/60)}:${String(x.duration%60).padStart(2,'0')}`:''}))}).catch(()=>[])}
 function spBtn(a,t){return `<a class="play" style="background:rgba(30,215,96,.15);color:#1ed760" target="_blank" href="https://open.spotify.com/search/${enc((t+' '+a).replace(/\s*\(.*?\)\s*/g,' ').trim())}" title="Apri su Spotify"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.6 14.4a.6.6 0 0 1-.9.2c-2.4-1.5-5.4-1.8-9-1a.6.6 0 1 1-.3-1.2c3.9-.9 7.2-.5 9.9 1.1.3.2.4.6.3.9zm1.2-2.7a.8.8 0 0 1-1.1.3c-2.7-1.7-6.9-2.2-10.2-1.2a.8.8 0 0 1-.5-1.5c3.7-1.1 8.3-.6 11.4 1.3.4.2.5.7.4 1.1zm.1-2.8C14.7 9 9.4 8.8 6.3 9.7a.9.9 0 1 1-.5-1.8c3.5-1.1 9.4-.9 13.1 1.3a.9.9 0 0 1-1 1.7z"/></svg></a>`}
 /* ---------- audio ---------- */
@@ -388,7 +394,14 @@ const fut=news.filter(x=>x.d>today()).sort((a,b)=>a.d.localeCompare(b.d)),past=n
 const nnew=news.filter(x=>S.seen[x.id]==='new').length;
 const card=x=>`<a class="news${isPrio(x.aid)?' prio':''}" href="#album/${x.id}"><div class="cov">${coverImg(x.id,x.artist,x.t,500)}${S.seen[x.id]==='new'?'<span class="badge">Nuovo</span>':''}</div><div class="t">${esc(x.t)}</div><div class="a">${isPrio(x.aid)?'<span class="prioStar">★</span> ':''}${esc(x.artist)}</div><div class="m"><span class="chip" style="margin:0">${typeOf(x)}</span>${whenBadge(x.d)||`<span class="small muted">${fmtDate(x.d)}</span>`}</div></a>`;
 const otd=await onThisDay();if(!ok())return;
-let html='';const pr=Object.values(S.artists).filter(a=>a.prio);
+let html='';const cdl=Object.entries(S.albums).filter(([,v])=>v.cd);
+if(cdl.length){cdl.sort((a,b)=>a[0].localeCompare(b[0]));const [did,dv]=cdl[dayHash(today())%cdl.length];
+html+=`<div class="sec" style="margin-top:8px"><h2>Il disco del giorno</h2><span class="small muted">dalla tua mensola</span></div>
+<a class="card" href="#album/${did}" style="display:flex;gap:16px;align-items:center;padding:14px;background:linear-gradient(135deg,rgba(214,179,106,.14),var(--card))"><div class="cov" style="width:118px;flex:none">${coverImg(did,dv.a,dv.t,500)}</div><div style="min-width:0"><div style="font-family:var(--serif);font-size:21px;line-height:1.15">${esc(dv.t)}</div><div class="muted" style="margin-top:4px">${esc(dv.a)}${dv.d?' · '+dv.d.slice(0,4):''}</div><div class="small muted" id="dstory" style="margin-top:8px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden"></div></div></a>`;
+setTimeout(()=>albumStory(did).then(t=>{const e=$('#dstory');if(e)e.textContent=t||(dv.d&&+dv.d.slice(0,4)<new Date().getFullYear()?`Uscito ${new Date().getFullYear()-+dv.d.slice(0,4)} anni fa. Rimettilo nel lettore!`:'')}),0);
+const rl=cdl.slice().sort((a,b)=>(a[1].lo||0)-(b[1].lo||0)).slice(0,Math.min(12,cdl.length));const [rid,rv]=rl[dayHash(weekKey())%rl.length];
+if(rid!==did)html+=`<a class="li" href="#album/${rid}" style="margin-top:10px;border:0;background:var(--card);border-radius:14px;padding:10px 12px"><div class="th">${coverImg(rid,rv.a,rv.t)}</div><div class="tx"><span style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Da riascoltare questa settimana</span><b>${esc(rv.t)}</b><span>${esc(rv.a)}${rv.lo?' · non lo apri da '+Math.round((Date.now()-rv.lo)/DAY)+' giorni':''}</span></div></a>`}
+const pr=Object.values(S.artists).filter(a=>a.prio);
 if(pr.length){const pn=news.filter(x=>isPrio(x.aid)).sort((a,b)=>b.d.localeCompare(a.d));
 html+=`<div class="sec"><h2>★ Le tue priorità</h2><a class="more" href="#artisti">Modifica</a></div><div class="hscroll" style="margin-bottom:4px">${pr.map(a=>`<a class="av" style="width:64px" href="#artista/${a.mbid}">${avatar(a.name,'pic prio" style="width:64px;height:64px')}<div class="n" style="font-size:11.5px">${esc(a.name)}</div></a>`).join('')}</div>`+
 (()=>{const grp=[['Nuovi dischi',x=>['Album','EP'].includes(typeOf(x))],['Singoli',x=>typeOf(x)==='Singolo'],['Raccolte e live',x=>['Raccolta','Live'].includes(typeOf(x))]];let h='';
@@ -439,11 +452,14 @@ artistPhoto(a.name).then(u=>{const e=$('#hbg');if(e&&u)e.style.backgroundImage=`
 let disc=[];try{disc=await discography(mbid)}catch(e){}if(!ok())return;
 const members=(a.relations||[]).filter(r=>r.type==='member of band'&&r.direction==='backward');
 const memberOf=(a.relations||[]).filter(r=>r.type==='member of band'&&r.direction==='forward');
-const T=[['disc','Discografia'],['top','Brani migliori'],members.length?['form','Formazione']:memberOf.length?['form','Gruppi']:null,['bio','Biografia'],['num','In cifre'],['live','Concerti']].filter(Boolean);
+const T=[['disc','Discografia'],['top','Brani migliori'],['sim','Artisti simili'],members.length?['form','Formazione']:memberOf.length?['form','Gruppi']:null,['bio','Biografia'],['num','In cifre'],['live','Concerti']].filter(Boolean);
 let cur='disc';
 const draw=async()=>{$('#atabs').innerHTML=T.map(([k,l])=>`<button class="tab ${k===cur?'on':''}" data-k="${k}">${l}</button>`).join('');
 $('#atabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{cur=b.dataset.k;draw()});const B=$('#abody');
-if(cur==='disc')B.innerHTML=discHTML(disc,a.name);
+if(cur==='disc'){B.innerHTML=`<div id="start"></div>`+discHTML(disc,a.name);topTracks(a.name).then(L=>{const c={};L.forEach(t=>{if(t.album)c[t.album]=(c[t.album]||0)+1});const best=Object.entries(c).sort((x,y)=>y[1]-x[1])[0];if(!best)return;
+const r=disc.find(x=>norm(x.t)===norm(best[0]))||disc.find(x=>norm(best[0]).startsWith(norm(x.t))&&x.t.length>3);const e=$('#start');if(!r||!e)return;
+e.innerHTML=`<a class="card" href="#album/${r.id}" style="display:flex;gap:14px;align-items:center;margin-top:12px;padding:12px"><div class="cov" style="width:72px;flex:none">${coverImg(r.id,a.name,r.t)}</div><div><div style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Se inizi da qui</div><div style="font-family:var(--serif);font-size:19px;margin-top:3px">${esc(r.t)}</div><div class="small muted">${r.d?r.d.slice(0,4)+' · ':''}l'album con più brani amati dai fan</div></div></a>`})}
+else if(cur==='sim'){B.innerHTML=loading;const L=await similarArtists(a.name);if(cur!=='sim')return;B.innerHTML=L.length?`<p class="small muted" style="margin:14px 0">Se ti piacciono i ${esc(a.name)}, prova questi. Quelli già tra i tuoi artisti hanno la ✓.</p><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:16px 12px">${L.map(x=>{const mine=Object.values(S.artists).some(y=>norm(y.name)===norm(x.name));return`<button class="av" style="width:100%;display:block" onclick='openArtist(${esc(JSON.stringify(x.name))})'><div class="pic" style="width:100%;height:auto;aspect-ratio:1">${x.img?`<img src="${esc(x.img)}">`:phHTML(x.name)}</div><div class="n">${mine?'<span class="prioStar">✓</span> ':''}${esc(x.name)}</div></button>`}).join('')}</div>`:'<div class="card muted small">Nessun artista simile trovato.</div>'}
 else if(cur==='form')B.innerHTML=members.length?membersHTML(members,by,ey):memberOf.map(r=>`<a class="li" href="#artista/${r.artist.id}">${avatar(r.artist.name,'th r')}<div class="tx"><b>${esc(r.artist.name)}</b><span>${esc([r.begin?.slice(0,4),r.end?.slice(0,4)||(r.ended?'':'oggi')].filter(Boolean).join(' – '))}${r.attributes?.length?' · '+esc(r.attributes.join(', ')):''}</span></div></a>`).join('');
 else if(cur==='bio'){B.innerHTML=loading;if(!qid){B.innerHTML='<div class="card muted">Biografia non disponibile.</div>';return}try{const w=await wikiInfo(qid);if(cur!=='bio')return;B.innerHTML=w.text?`<div class="bio">${w.text.split('\n').filter(Boolean).map(p=>`<p>${esc(p)}</p>`).join('')}<a class="small" style="color:var(--gold)" target="_blank" href="https://${w.lang}.wikipedia.org/wiki/${enc(w.title)}">Continua su Wikipedia${w.lang==='en'?' (in inglese)':''} →</a></div>`:'<div class="card muted">Biografia non disponibile.</div>'}catch(e){B.innerHTML='<div class="card muted">Biografia non disponibile.</div>'}}
 else if(cur==='num')B.innerHTML=numbersHTML(a,disc,members,by,ey);
@@ -491,6 +507,7 @@ function concertRow(c){const[y,m,d]=(c.date||'--').split('-');const nw=(S.seenGi
 async function vAlbum(app,rgid,ok){app.innerHTML=loading;let rg;
 try{rg=await mbc(`release-group/${rgid}?inc=releases+artist-credits+genres+tags`,7*DAY)}catch(e){app.innerHTML=`<div class="empty"><h3>Album non disponibile</h3><p>${esc(e.message)}</p></div>`;return}if(!ok())return;
 if(S.seen[rgid]==='new'){S.seen[rgid]='old';save()}
+if(S.albums[rgid]&&(!S.albums[rgid].lo||Date.now()-S.albums[rgid].lo>DAY)){S.albums[rgid].lo=Date.now();save()}
 const artist=(rg['artist-credit']||[]).map(c=>c.name+(c.joinphrase||'')).join('')||'';const aid=rg['artist-credit']?.[0]?.artist?.id;
 const rels=(rg.releases||[]).filter(r=>r.status==='Official'||!r.status).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
 const mine=S.albums[rgid]||{};const genres=(rg.genres?.length?rg.genres:(rg.tags||[])).sort((x,y)=>y.count-x.count).slice(0,5).map(g=>g.name);
@@ -572,8 +589,9 @@ if(id)$('#ddel',s).onclick=()=>{S.diary=S.diary.filter(x=>x.id!==id);save();s.re
 let coltab='cd';
 function vCollection(app){const A=Object.entries(S.albums);const cds=A.filter(([,v])=>v.cd).sort((a,b)=>(a[1].a||'').localeCompare(b[1].a||'')||(a[1].d||'').localeCompare(b[1].d||''));const rated=A.filter(([,v])=>v.r).sort((a,b)=>b[1].r-a[1].r||(a[1].t||'').localeCompare(b[1].t||''));
 app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">La mia mensola</h1><div class="sub">${cds.length} CD · ${rated.length} album votati</div></div></div>
-<div class="tabs" id="colt">${[['cd','I miei CD'],['r','I miei voti'],['w','I miei anni']].map(([k,l])=>`<button class="tab ${k===coltab?'on':''}" data-k="${k}">${l}</button>`).join('')}</div><div id="colb"></div>`;
+<div class="tabs" id="colt">${[['cd','I miei CD'],['st','Statistiche'],['r','I miei voti'],['w','I miei anni']].map(([k,l])=>`<button class="tab ${k===coltab?'on':''}" data-k="${k}">${l}</button>`).join('')}</div><div id="colb"></div>`;
 $('#colt').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{coltab=b.dataset.k;vCollection(app)});setTimeout(()=>coltab==='cd'?attachIndex():document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove()),0);
+if(coltab==='st'){$('#colb').innerHTML=statsHTML();return}
 if(coltab==='w'){const W=Object.entries(S.wrapped||{}).sort((a,b)=>b[0]-a[0]);
 $('#colb').innerHTML=(W.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:14px">${W.map(([y,w])=>`<button class="card" style="text-align:left;background:linear-gradient(145deg,hsl(${hue(y)},40%,22%),hsl(${(hue(y)+60)%360},45%,10%));border:0;min-height:150px;display:flex;flex-direction:column;justify-content:space-between" onclick="vWrapped('${y}')"><span class="small" style="color:#f2dca4;letter-spacing:.12em;text-transform:uppercase;font-weight:700">Il mio anno</span><span><b style="font-family:var(--serif);font-size:38px;color:#fff;display:block">${y}</b><span class="small" style="color:rgba(255,255,255,.75)">${w.min!=null?w.min.toLocaleString('it-IT')+' minuti':''}${w.art?.[0]?' · n.1 '+esc(w.art[0].n):w.pl?' · '+w.pl.length+' brani':''}</span></span></button>`).join('')}</div>`:'')+
 `<div class="card" style="margin-top:18px"><h3 style="font-size:19px">${W.length?'Aggiorna i tuoi anni':'I tuoi Wrapped, anno per anno'}</h3><p class="small muted" style="line-height:1.55">Le playlist <b>"I tuoi brani preferiti del…"</b> salvate nella tua libreria vengono lette quando importi da Spotify. Per avere <b>tutti gli anni</b> con minuti, artisti, brani e album: su spotify.com → Account → Privacy → <b>Scarica i tuoi dati</b>, spunta <b>Cronologia streaming estesa</b>. Quando arriva l'email (qualche giorno), carica qui i file <b>Streaming_History_Audio_….json</b>.</p>
@@ -609,6 +627,17 @@ return `<p class="small muted" style="margin:6px 0 0">${keys.length} artisti</p>
 const lt=letterOf(k);const first=lt!==shelfHTML._l;shelfHTML._l=lt;
 return `${first?`<div data-az="${lt}" style="font-family:var(--serif);font-size:15px;color:var(--gold);margin:30px 0 -14px;padding-right:22px;border-bottom:1px solid var(--line)">${lt}</div>`:''}<a class="row" style="margin:26px 0 12px;gap:12px;padding-right:22px" ${g.aid?`href="#artista/${g.aid}"`:''}><div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex:none">${avatar(k,'pic" style="width:42px;height:42px;border:0;box-shadow:none')}</div><div style="flex:1"><div style="font-family:var(--serif);font-size:20px">${esc(k)}</div><div class="small muted">${g.L.length} CD</div></div></a>
 <div class="shelf" style="padding-right:22px">${g.L.map(([id,v])=>`<a href="#album/${id}"><div class="jewel">${coverImg(id,v.a,v.t)}</div><div class="alb"><div class="t">${esc(v.t)}</div><div class="y">${v.d?v.d.slice(0,4):'—'}</div></div></a>`).join('')}</div>`}).join('')}
+function statsHTML(){const cds=Object.values(S.albums).filter(v=>v.cd);const arts={};cds.forEach(v=>arts[v.a]=(arts[v.a]||0)+1);
+const dec={};cds.forEach(v=>{if(v.d){const d=Math.floor(+v.d.slice(0,4)/10)*10;dec[d]=(dec[d]||0)+1}});const decs=Object.keys(dec).sort();const maxd=Math.max(1,...Object.values(dec));
+const topA=Object.entries(arts).sort((a,b)=>b[1]-a[1]).slice(0,10);const maxa=Math.max(1,...topA.map(x=>x[1]));
+const rated=Object.values(S.albums).filter(v=>v.r).length,gigs=S.diary.length,nart=Object.keys(S.artists).length,maxPer=topA[0]?topA[0][1]:0;
+const bar=(l,n,m,ex='')=>`<div style="display:grid;grid-template-columns:92px 1fr 34px;gap:10px;align-items:center;margin:7px 0"><span class="small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</span><div style="height:10px;border-radius:5px;background:var(--card)"><div style="height:100%;width:${(n/m*100).toFixed(1)}%;border-radius:5px;background:linear-gradient(90deg,var(--gold),var(--gold2))"></div></div><span class="small muted" style="text-align:right">${n}</span></div>`;
+const T=[['💿','Collezionista','CD sulla mensola',cds.length,[10,50,100,250,500]],['❤️','Fedeltà','CD dello stesso artista',maxPer,[3,5,10,20]],['⏳','Viaggio nel tempo','decenni diversi',decs.length,[3,4,5,6]],['🎤','Esploratore','artisti seguiti',nart,[25,50,100,150,250]],['⭐','Critico','album votati',rated,[5,25,50,100]],['🎫','Dal vivo','concerti nel diario',gigs,[1,5,10,25]]];
+const med=['🥉','🥈','🥇','🏆','👑'];
+return `<div class="stats" style="margin-top:14px"><div class="stat"><b>${cds.length}</b><span>CD</span></div><div class="stat"><b>${Object.keys(arts).length}</b><span>artisti in mensola</span></div><div class="stat"><b>${decs.length}</b><span>decenni</span></div><div class="stat"><b>${gigs}</b><span>concerti visti</span></div></div>
+<div class="sec"><h2>I tuoi traguardi</h2></div>${T.map(([ic,n,d,v,lv])=>{const got=lv.filter(x=>v>=x).length;const next=lv.find(x=>v<x);return`<div class="card" style="display:flex;gap:14px;align-items:center;margin-bottom:10px;padding:12px 14px"><div style="font-size:30px;width:40px;text-align:center">${got?med[Math.min(got,5)-1]:ic}</div><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><b>${n}</b><span class="small muted">${got}/${lv.length}</span></div><div class="small muted">${next?`${v} su ${next} ${d}`:`Completato: ${v} ${d}!`}</div><div style="height:6px;border-radius:3px;background:var(--card2);margin-top:7px"><div style="height:100%;border-radius:3px;width:${next?Math.min(100,v/next*100):100}%;background:linear-gradient(90deg,var(--gold),var(--gold2))"></div></div></div></div>`}).join('')}
+${decs.length?`<div class="sec"><h2>Per decennio</h2></div>${decs.map(d=>bar(decName(+d),dec[d],maxd)).join('')}`:''}
+${topA.length?`<div class="sec"><h2>I più presenti</h2></div>${topA.map(([a,n])=>bar(esc(a),n,maxa)).join('')}`:''}`}
 /* ---------- SPOTIFY ---------- */
 const redirectUri=()=>location.origin+location.pathname;
 const b64url=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
