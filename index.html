@@ -244,7 +244,29 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 #intro .skip{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 26px);left:0;right:0;text-align:center;color:#6f6a60;font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:0;animation:fadeup .8s 2.2s forwards}
 .brandrow{display:flex;align-items:flex-end;gap:10px}
 .eq.mini{height:22px;gap:3px;margin:0 0 6px}.eq.mini b{width:3.5px}
-@media(min-width:800px){.hero{border-radius:0 0 28px 28px}.news{width:190px}.hero h1{font-size:48px}}
+/* poster "Di sempre": doppio, a sinistra del gruppo */
+.wposter.big{grid-column:span 2;aspect-ratio:2/1}
+.wposter.big .lab div:nth-child(2){font-size:34px!important}
+@media(min-width:700px){.wposter.big{grid-row:span 2;aspect-ratio:1}.wposter.big .lab div:nth-child(2){font-size:46px!important}}
+/* ---------- iPad e schermi larghi ---------- */
+@media(min-width:800px){
+#app{max-width:1180px;padding-left:36px;padding-right:36px}
+.hscroll{margin:0 -36px;padding-left:36px;padding-right:36px}
+.hero{margin:calc(-14px - env(safe-area-inset-top)) -36px 0;padding-left:36px;padding-right:36px;min-height:380px;border-radius:0 0 28px 28px}.hero h1{font-size:54px}
+.brand .lo-loud{font-size:56px}.sec h2{font-size:26px}
+.news{width:200px}.news .t{font-size:16px!important}
+.duo{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;align-items:stretch}.duo>.li{margin-top:0!important;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px}.duo>.li .th{width:96px;height:96px}
+.grid.alb{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.shelf{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:24px 20px}
+.stats{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.trk{padding:13px 4px}.trk .tt{font-size:15.5px}
+.li .th{width:62px;height:62px}
+.sheet{align-items:center}.sheet .in{border-radius:26px;max-height:86vh;max-width:720px;margin:0 20px}
+nav.bn{width:560px}
+.azidx b{font-size:12px;line-height:1.45}
+#intro .lo-loud{font-size:150px}
+}
+@media(min-width:1100px){.news{width:220px}.grid.alb{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}}
 </style>
 </head>
 <body>
@@ -254,7 +276,7 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.32';
+const VER='1.33';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -463,11 +485,11 @@ const card=x=>`<a class="news${isPrio(x.aid)?' prio':''}" href="#album/${x.id}">
 const otd=await onThisDay();if(!ok())return;
 let html='';const cdl=Object.entries(S.albums).filter(([,v])=>v.cd);
 if(cdl.length){cdl.sort((a,b)=>a[0].localeCompare(b[0]));const [did,dv]=cdl[dayHash(today())%cdl.length];
-html+=`<div class="sec" style="margin-top:8px"><h2>Il disco del giorno</h2><span class="small muted">dalla tua mensola</span></div>
+html+=`<div class="sec" style="margin-top:8px"><h2>Il disco del giorno</h2><span class="small muted">dalla tua mensola</span></div><div class="duo">
 <a class="card" href="#album/${did}" style="display:flex;gap:16px;align-items:center;padding:14px;background:linear-gradient(135deg,rgba(214,179,106,.14),var(--card))"><div class="cov" style="width:118px;flex:none">${coverImg(did,dv.a,dv.t,500)}</div><div style="min-width:0"><div style="font-family:var(--serif);font-size:21px;line-height:1.15">${esc(dv.t)}</div><div class="muted" style="margin-top:4px">${esc(dv.a)}${dv.d?' · '+dv.d.slice(0,4):''}</div><div class="small muted" id="dstory" style="margin-top:8px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden"></div></div></a>`;
 setTimeout(()=>albumStory(did).then(t=>{const e=$('#dstory');if(e)e.textContent=t||(dv.d&&+dv.d.slice(0,4)<new Date().getFullYear()?`Uscito ${new Date().getFullYear()-+dv.d.slice(0,4)} anni fa. Rimettilo nel lettore!`:'')}),0);
 const rl=cdl.slice().sort((a,b)=>(a[1].lo||0)-(b[1].lo||0)).slice(0,Math.min(12,cdl.length));const [rid,rv]=rl[dayHash(weekKey())%rl.length];
-if(rid!==did)html+=`<a class="li" href="#album/${rid}" style="margin-top:10px;border:0;background:var(--card);border-radius:14px;padding:10px 12px"><div class="th">${coverImg(rid,rv.a,rv.t)}</div><div class="tx"><span style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Da riascoltare questa settimana</span><b>${esc(rv.t)}</b><span>${esc(rv.a)}${rv.lo?' · non lo apri da '+Math.round((Date.now()-rv.lo)/DAY)+' giorni':''}</span></div></a>`}
+if(rid!==did)html+=`<a class="li" href="#album/${rid}" style="margin-top:10px;border:0;background:var(--card);border-radius:14px;padding:10px 12px"><div class="th">${coverImg(rid,rv.a,rv.t)}</div><div class="tx"><span style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Da riascoltare questa settimana</span><b>${esc(rv.t)}</b><span>${esc(rv.a)}${rv.lo?' · non lo apri da '+Math.round((Date.now()-rv.lo)/DAY)+' giorni':''}</span></div></a>`;html+='</div>'}
 const pr=Object.values(S.artists).filter(a=>a.prio);const html0=html;html='';
 if(pr.length){const pn=news.filter(x=>isPrio(x.aid)).sort((a,b)=>b.d.localeCompare(a.d));
 html+=`<div class="sec"><h2>★ Le tue priorità</h2><a class="more" href="#artisti">Modifica</a></div><div class="hscroll" style="margin-bottom:4px">${pr.map(a=>`<a class="av" style="width:64px" href="#artista/${a.mbid}">${avatar(a.name,'pic prio" style="width:64px;height:64px')}<div class="n" style="font-size:11.5px">${esc(a.name)}</div></a>`).join('')}</div>`+
@@ -664,7 +686,7 @@ app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">La mia mensola</
 $('#colt').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{coltab=b.dataset.k;vCollection(app)});setTimeout(()=>coltab==='cd'?attachIndex():document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove()),0);
 if(!['cd','w'].includes(coltab))coltab='cd';
 if(coltab==='w'){const W=Object.entries(S.wrapped||{}).sort((a,b)=>(b[0]==='sempre')-(a[0]==='sempre')||b[0]-a[0]);
-$('#colb').innerHTML=(W.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:14px">${W.map(([y,w])=>{const T=wrTracks(w).slice(0,4);return`<button class="wposter" ${y==='sempre'?'style="grid-column:1/-1;aspect-ratio:2/1"':''} onclick="vWrapped('${y}')"><div class="mos">${[0,1,2,3].map(i=>{const x=T[i];return x?`<div class="wtile ${x.img?'ok':''}" ${x.img?`style="background-image:url('${esc(x.img)}')"`:`data-tc='${esc(JSON.stringify([x.a,x.t]))}'`}></div>`:'<div class="wtile"></div>'}).join('')}</div><div class="lab"><div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#f2dca4;font-weight:700">${y==='sempre'?'I più ascoltati':'Il mio anno'}</div><div style="font-family:var(--serif);font-size:${y==='sempre'?34:40}px;line-height:1">${y==='sempre'?'Di sempre':y}</div><div style="font-size:11.5px;opacity:.85;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${T[0]?'n.1 '+esc(T[0].t):w.min!=null?w.min.toLocaleString('it-IT')+' minuti':''}</div></div></button>`}).join('')}</div>`:'')+
+$('#colb').innerHTML=(W.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:14px">${W.map(([y,w])=>{const T=wrTracks(w).slice(0,4);return`<button class="wposter${y==='sempre'?' big':''}" onclick="vWrapped('${y}')"><div class="mos">${[0,1,2,3].map(i=>{const x=T[i];return x?`<div class="wtile ${x.img?'ok':''}" ${x.img?`style="background-image:url('${esc(x.img)}')"`:`data-tc='${esc(JSON.stringify([x.a,x.t]))}'`}></div>`:'<div class="wtile"></div>'}).join('')}</div><div class="lab"><div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#f2dca4;font-weight:700">${y==='sempre'?'I più ascoltati':'Il mio anno'}</div><div style="font-family:var(--serif);font-size:${y==='sempre'?34:40}px;line-height:1">${y==='sempre'?'Di sempre':y}</div><div style="font-size:11.5px;opacity:.85;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${T[0]?'n.1 '+esc(T[0].t):w.min!=null?w.min.toLocaleString('it-IT')+' minuti':''}</div></div></button>`}).join('')}</div>`:'')+
 `<div class="card" style="margin-top:18px"><h3 style="font-size:19px">${W.length?'Aggiorna i tuoi anni':'I tuoi Wrapped, anno per anno'}</h3><p class="small muted" style="line-height:1.55">Le playlist <b>"I tuoi brani preferiti del…"</b> salvate nella tua libreria vengono lette quando importi da Spotify. Per avere <b>tutti gli anni</b> con minuti, artisti, brani e album: su spotify.com → Account → Privacy → <b>Scarica i tuoi dati</b>, spunta <b>Cronologia streaming estesa</b>. Quando arriva l'email (qualche giorno), carica qui i file <b>Streaming_History_Audio_….json</b>.</p>
 <label class="btn sm">Carica la cronologia<input type="file" accept=".json" multiple style="display:none" onchange="importHistory(this)"></label></div>`;fillCovers($('#colb'));return}
 $('#colb').innerHTML=coltab==='cd'?(cds.length?`<div class="tabs" style="margin-top:10px">${[['g','Per gruppo'],['a','Per album']].map(([k,l])=>`<button class="tab ${(K.cdsort||'g')===k?'on':''}" onclick="K.cdsort='${k}';saveKeys();render()">${l}</button>`).join('')}</div>`+((K.cdsort||'g')==='a'?shelfByAlbum(cds):shelfHTML(cds)):`<div class="card empty"><h3>La mensola è vuota</h3><p>Apri un album e tocca "Ce l'ho in CD", oppure aggiungili tutti insieme da un elenco.</p></div>`)
