@@ -253,6 +253,8 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 .btab .bk,.btab .bv{padding:9px 0;border-top:1px solid var(--line);font-size:14px}
 .btab .bk{color:var(--mu);font-size:12.5px;white-space:nowrap}
 .btab .bv{min-width:0}
+.btab .cont{border-top:0;padding-top:0}
+.btab .lu{display:block;margin-bottom:1px;color:var(--gold);font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:600}
 @media(min-width:800px){.brief{display:grid;grid-template-columns:1fr 1.2fr;gap:0 28px;align-items:start}.brief>div:first-child{grid-column:1/-1}.brief .btab{margin-top:6px}}
 /* priorità in colonne */
 .pgrid{display:grid;grid-template-columns:1fr;gap:0 22px}
@@ -286,7 +288,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.37';
+const VER='1.38';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -575,6 +577,13 @@ B.innerHTML=L.length?`<p class="small muted" style="margin:14px 0 4px">I 20 bran
 else if(cur==='live'){if(!S.settings.tm){B.innerHTML=`<div class="card small muted">Per vedere i concerti inserisci la chiave Ticketmaster nelle <a style="color:var(--gold)" href="#impostazioni">Impostazioni</a>.</div>`;return}B.innerHTML=loading;const cs=await concertsFor(a.name);if(cur!=='live')return;
 const it=cs.filter(c=>c.cc==='IT'),w=cs.filter(c=>c.cc!=='IT');B.innerHTML=(cs.length?`${it.length?`<div class="sec"><h2>🇮🇹 In Italia</h2></div>${it.map(concertRow).join('')}`:''}${w.length?`<div class="sec"><h2>Nel mondo</h2></div>${w.map(concertRow).join('')}`:''}`:'<div class="card muted small">Nessun concerto annunciato al momento.</div>')}};
 draw()}
+function age(b){const d=new Date(b.length===4?b+'-07-01':b.length===7?b+'-15':b);const n=new Date();let y=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))y--;return y}
+function lineups(members,by,ey){if(!members.length)return[];const now=new Date().getFullYear(),end=ey||now;const seg=[];
+members.forEach(r=>{const s0=parseInt(r.begin)||by;if(!s0)return;const e0=r.end?parseInt(r.end):(r.ended?null:end);seg.push({n:r.artist.name.split(' ').slice(-1)[0],full:r.artist.name,s:s0,e:e0??end})});
+if(!seg.length)return[];const yrs=[...new Set(seg.flatMap(x=>[x.s,x.e+1]))].filter(y=>y<=end).sort((a,b)=>a-b);const out=[];
+for(let i=0;i<yrs.length;i++){const y=yrs[i],ny=(yrs[i+1]||end+1)-1;if(y>ny)continue;const nm=[...new Set(seg.filter(x=>x.s<=y&&x.e>=y).map(x=>x.full))];if(!nm.length)continue;
+const last=out[out.length-1];if(last&&last.names.join()===nm.join()){last.to=ny;continue}out.push({from:y,to:ny,names:nm})}
+return out.length>1?out.slice(-8):[]}
 function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
 const real=disc.filter(r=>r.d);const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
 const fut=pick(r=>r.d>t).reverse()[0];const alb=pick(r=>r.d<=t&&typeOf(r)==='Album')[0];const sng=pick(r=>r.d<=t&&(typeOf(r)==='Singolo'||typeOf(r)==='EP'))[0];
@@ -582,7 +591,10 @@ const cur=[...new Set(members.filter(r=>!r.ended&&!r.end).map(r=>r.artist.name))
 const link=r=>r?`<a href="#album/${r.id}" style="color:var(--tx)"><b style="font-weight:600">${esc(r.t)}</b> <span class="muted">· ${fmtDate(r.d)}</span></a>`:'<span class="muted">—</span>';
 const rows=[
 [a.type==='Group'?'Gruppo':'Artista',`${esc(a.name)}${a.area?.name?` <span class="muted">· ${esc(a.area.name)}</span>`:''}${by?` <span class="muted">· dal ${by}${ey?' al '+ey:''}</span>`:''}`],
-cur.length?['Formazione',esc(cur.join(', '))]:null,
+a.type==='Person'&&a['life-span']?.begin?[a['life-span'].ended?'Nato':'Nato',`${fmtDate(a['life-span'].begin)}${a['begin-area']?.name?' a '+esc(a['begin-area'].name):''}${!a['life-span'].ended&&a['life-span'].begin.length>=4?` <span class="muted">· ${age(a['life-span'].begin)} anni</span>`:''}`]:null,
+a.type==='Person'&&a['life-span']?.ended&&a['life-span'].end?['Morto',`${fmtDate(a['life-span'].end)}${a['end-area']?.name?' a '+esc(a['end-area'].name):''}`]:null,
+cur.length&&lineups(members,by,ey).length<2?['Formazione',esc(cur.join(', '))]:null,
+...lineups(members,by,ey).map((l,i,L)=>[i===0?'Line-up':'',`<span class="lu">${l.from===l.to?l.from:l.from+'–'+(i===L.length-1&&!ey?'oggi':l.to)}</span>${esc(l.names.join(', '))}`]),
 ['Prossima uscita',fut?`${link(fut)} ${whenBadge(fut.d)}`:'<span class="muted">Nessuna annunciata</span>'],
 ['Ultimo album',link(alb)],
 ['Ultimo singolo',link(sng)],
@@ -590,7 +602,7 @@ cur.length?['Formazione',esc(cur.join(', '))]:null,
 ['Notizie e rumors',`<a target="_blank" style="color:var(--gold)" href="https://news.google.com/search?q=${enc('"'+a.name+'"')}&hl=it&gl=IT&ceid=IT:it">Le ultime notizie →</a>`]].filter(Boolean);
 B.innerHTML=`<div class="card brief" style="margin-top:18px"><div style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase">In breve</div>
 <p id="bbio" class="bio" style="margin:8px 0 4px;font-size:15px;line-height:1.55;font-family:var(--serif)"></p>
-<div class="btab">${rows.map(([k,v])=>`<div class="bk">${k}</div><div class="bv">${v}</div>`).join('')}</div></div>`;
+<div class="btab">${rows.map(([k,v])=>`<div class="bk${k?'':' cont'}">${k}</div><div class="bv${k?'':' cont'}">${v}</div>`).join('')}</div></div>`;
 if(qid)wikiInfo(qid).then(w=>{const e=$('#bbio');if(!e)return;const txt=(w.text||'').replace(/\s*\([^)]*\)/g,'').replace(/\s+/g,' ').trim();const sents=txt.match(/[^.!?]+[.!?]+/g)||[];e.textContent=sents.slice(0,2).join(' ').trim();if(!e.textContent)e.remove()}).catch(()=>{});else{const e=$('#bbio');e&&e.remove()}
 if(S.settings.tm)concertsFor(a.name).then(cs=>{const e=$('#bgig');if(!e)return;const it=cs.filter(c=>c.cc==='IT'&&c.date>=t);const all=cs.filter(c=>c.date>=t);
 e.className='';e.innerHTML=it.length?`<b style="font-weight:600">${esc(it[0].city)}</b> <span class="muted">· ${fmtDate(it[0].date)}${it.length>1?` · e altre ${it.length-1} date in Italia`:''}</span>`:all.length?`<span class="muted">Nessuna data in Italia · ${all.length} all'estero</span>`:'<span class="muted">Nessun concerto annunciato</span>'})}
