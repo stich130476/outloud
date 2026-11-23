@@ -239,7 +239,7 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.28';
+const VER='1.29';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -344,8 +344,13 @@ async function initPrio(){if(!K.synced&&!Object.keys(S.artists).length)return;if
 for(const name of todo){let a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));
 if(!a){try{const j=await mb(`artist?query=${enc('artist:"'+name+'"')}&limit=5`,false);const m=(j.artists||[]).find(x=>norm(x.name)===norm(name)&&x.score>=90);if(m){addArtist(m.id,m.name);a=S.artists[m.id];discography(m.id,false).catch(()=>{})}}catch(e){}}
 if(a)a.prio=true}save();if(route().v==='home'||route().v==='artisti')render()}
-async function checkNews(force=false){if(checking)return checking;const ids=Object.keys(S.artists);if(!ids.length)return;
-if(!force&&Date.now()-S.lastCheck<6*3600e3)return;
+async function loadDisco(){if(!K.gh)return false;try{const d=await ghFile('discografie.json');if(!d||!d.a)return false;if(d.at<=(K.discoAt||0))return true;
+const cutoff=new Date(Date.now()-75*DAY).toISOString().slice(0,10);const fresh=[];
+for(const [id,L] of Object.entries(d.a)){const v=L.map(([i,t,dd,p,sx])=>({id:i,t,d:dd,p,s:sx}));await idb.set('disc:'+id,{t:d.at,v});const a=S.artists[id];if(!a)continue;
+for(const r of v)if(r.d&&r.d>=cutoff&&!S.seen[r.id]){S.seen[r.id]=a.checked?'new':'old';if(a.checked)fresh.push(r)}a.checked=1}
+K.discoAt=d.at;saveKeys();S.lastCheck=Math.max(S.lastCheck||0,d.at);save();return true}catch(e){return false}}
+async function checkNews(force=false){if(checking)return checking;if(!force&&await loadDisco()){const miss=Object.keys(S.artists).filter(id=>!S.artists[id].checked);if(!miss.length){if(route().v==='home')render();return}}
+const ids=Object.keys(S.artists).filter(id=>force||!S.artists[id].checked||Date.now()-S.lastCheck>=6*3600e3);if(!ids.length)return;
 checking=(async()=>{const fresh=[];let i=0;const cutoff=new Date(Date.now()-75*DAY).toISOString().slice(0,10);
 for(const id of ids){i++;setProgress(`Controllo novità ${i}/${ids.length}…`);const a=S.artists[id];
 try{const disc=await discography(id,false,true);for(const r of disc){if(r.d&&r.d>=cutoff){const k=r.id;if(!S.seen[k]){if(a.checked)fresh.push({...r,artist:a.name,aid:id});S.seen[k]=a.checked?'new':'old'}}}a.checked=1}catch(e){}}
