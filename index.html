@@ -297,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.45';
+const VER='1.46';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -634,8 +634,24 @@ return out}
 function discoHTML(L){return `<div class="sec"><h2>Da scoprire oggi</h2><span class="small muted">per i tuoi gusti</span></div><div class="dgrid">${L.map(d=>`<div class="dcard">
 <div class="cov">${d.cover?`<img src="${esc(d.cover)}" alt="">`:phHTML(d.album)}<button class="play dp" data-u="${esc(d.prev||'')}" data-a="${esc(d.name)}" data-t="${esc(d.track)}" onclick="playPrev(this)">${I.play}</button><span class="ds">${spBtn(d.name,d.album)}</span></div>
 <div class="dt">${esc(d.album)}</div><button class="da" onclick='openArtist(${esc(JSON.stringify(d.name))})'>${esc(d.name)}</button><div class="dv">come ${esc(d.via[0]||'')}</div></div>`).join('')}</div>`}
+/* verifica incrociata delle uscite: MusicBrainz + Deezer + Apple Music, scartando live, ristampe e raccolte */
+const NOTSTUDIO=/\b(live|en vivo|dal vivo|in concert|unplugged|session|sessions|recordings|remaster(ed)?|deluxe|edition|anniversary|expanded|reissue|collection|best of|greatest|hits|anthology|essentials|b-sides|rarities|demos?|instrumentals?|karaoke|remix(es)?|mix|edit|version|acoustic|tribute|soundtrack|ost|commentary|bonus|box set)\b/i;
+function itAlbums(name){return cached('ital:'+name,2*DAY,async()=>{const r=await jsonp(`https://itunes.apple.com/search?term=${enc(name)}&entity=album&attribute=artistTerm&limit=100&country=it`);
+return((r&&r.results)||[]).filter(x=>norm(x.artistName)===norm(name)).map(x=>{const raw=x.collectionName||'';const k=/ - Single$/i.test(raw)?'single':/ - EP$/i.test(raw)?'ep':'album';return{t:raw.replace(/ - (Single|EP)$/i,''),d:(x.releaseDate||'').slice(0,10),k,tracks:x.trackCount||0}})}).catch(()=>[])}
+async function releaseCheck(name,disc,mb){const [D,A]=await Promise.all([dzReleases(name),itAlbums(name)]);const t=today();
+const mbAny={};disc.forEach(r=>{const k=norm(baseTitle(r.t));if(!mbAny[k]||r.d<mbAny[k].d)mbAny[k]=r});
+const ok=x=>x.d&&!NOTSTUDIO.test(x.t)&&!/\(|\[/.test(x.t.replace(/\((feat|ft|with)\.?[^)]*\)/i,''));
+const known=x=>{const m=mbAny[norm(baseTitle(x.t))];return m?(typeOf(m)!=='Album'&&typeOf(m)!=='Singolo'&&typeOf(m)!=='EP')||m.d.slice(0,4)<x.d.slice(0,4):false};
+const both=(x,L)=>L.some(y=>norm(baseTitle(y.t))===norm(baseTitle(x.t))&&Math.abs(new Date(y.d)-new Date(x.d))<45*DAY);
+const pool=(kinds)=>{const dz=D.filter(x=>kinds.includes(x.k)).map(x=>({...x,src:'dz'}));const am=A.filter(x=>kinds.includes(x.k)).map(x=>({...x,src:'am'}));
+return [...dz,...am].filter(x=>ok(x)&&!known(x)&&both(x,x.src==='dz'?am:dz))};
+const pick=(L,fut)=>L.filter(x=>fut?x.d>t:x.d<=t).sort((x,y)=>fut?x.d.localeCompare(y.d):y.d.localeCompare(x.d))[0];
+const newer=(x,cur)=>x&&(!cur||!cur.d||x.d.slice(0,10)>cur.d.slice(0,10))?x:null;
+const albP=pool(['album']),sngP=pool(['single','ep']);
+const out={alb:newer(pick(albP,0),mb.alb),sng:newer(pick(sngP,0),mb.sng)};const f=pick([...albP,...sngP],1);out.fut=f&&(!mb.fut||f.d<mb.fut.d)?f:null;
+const dzm=x=>x&&(D.find(y=>norm(baseTitle(y.t))===norm(baseTitle(x.t)))||{}).dz;['alb','sng','fut'].forEach(k=>{if(out[k]&&!out[k].dz)out[k].dz=dzm(out[k])});return out}
 function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
-const real=disc.filter(r=>r.d);const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
+const real=disc.filter(r=>r.d&&!NOTSTUDIO.test(r.t));const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
 const fut=pick(r=>r.d>t).reverse()[0];const alb=pick(r=>r.d<=t&&typeOf(r)==='Album')[0];const sng=pick(r=>r.d<=t&&(typeOf(r)==='Singolo'||typeOf(r)==='EP'))[0];
 const cur=[...new Set(members.filter(r=>!r.ended&&!r.end).map(r=>r.artist.name))];
 const link=r=>r?`<a href="#album/${r.id}" style="color:var(--tx)"><b style="font-weight:600">${esc(r.t)}</b> <span class="muted">· ${fmtDate(r.d)}</span></a>`:'<span class="muted">—</span>';
@@ -653,13 +669,11 @@ cur.length&&lineups(members,by,ey).length<2?['Formazione',esc(cur.join(', '))]:n
 B.innerHTML=`<div class="card brief" style="margin-top:18px"><div style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase">In breve</div>
 <p id="bbio" class="bio" style="margin:8px 0 4px;font-size:15px;line-height:1.55;font-family:var(--serif)"></p>
 <div class="btab">${rows.map(([k,v])=>`<div class="bk${k?'':' cont'}">${k}</div><div class="bv${k?'':' cont'}">${v}</div>`).join('')}</div></div>`;
-dzReleases(a.name).then(R=>{if(!R.length||!$('#brief'))return;const t2=today();
-const best=(k,fut)=>R.filter(x=>x.d&&(k.includes(x.k))&&(fut?x.d>t2:x.d<=t2)).sort((x,y)=>fut?x.d.localeCompare(y.d):y.d.localeCompare(x.d))[0];
-const mb=k=>disc.find(r=>norm(r.t)===norm(k.t));
-const cell=(lab,x,cur)=>{if(!x)return;if(cur&&cur.d&&cur.d>=x.d)return;const r=mb(x);const html=r?`<a href="#album/${r.id}" style="color:var(--tx)"><b style="font-weight:600">${esc(x.t)}</b> <span class="muted">· ${fmtDate(x.d)}</span></a>`:`<a target="_blank" href="https://www.deezer.com/album/${x.dz}" style="color:var(--tx)"><b style="font-weight:600">${esc(x.t)}</b> <span class="muted">· ${fmtDate(x.d)}</span></a>`;
+releaseCheck(a.name,disc,{alb,sng,fut}).then(r=>{if(!r||!$('#brief'))return;
+const cell=(lab,x)=>{if(!x)return;const m=disc.find(q=>norm(q.t)===norm(x.t));const href=m?`#album/${m.id}`:(x.dz?`https://www.deezer.com/album/${x.dz}`:'');
+const html=`<a ${href.startsWith('#')?'':'target="_blank"'} href="${href}" style="color:var(--tx)"><b style="font-weight:600">${esc(x.t)}</b> <span class="muted">· ${fmtDate(x.d)}</span></a>`;
 const k=[...document.querySelectorAll('#brief .bk')].find(e=>e.textContent===lab);if(k)k.nextElementSibling.innerHTML=html+(lab==='Prossima uscita'?' '+whenBadge(x.d):'')};
-cell('Ultimo album',best(['album'],0),alb);cell('Ultimo singolo',best(['single','ep'],0),sng);
-const f=best(['album','single','ep'],1);if(f&&(!fut||f.d<fut.d))cell('Prossima uscita',f,null)});
+cell('Ultimo album',r.alb);cell('Ultimo singolo',r.sng);cell('Prossima uscita',r.fut)});
 if(qid)wikiInfo(qid).then(w=>{const e=$('#bbio');if(!e)return;const txt=(w.text||'').replace(/\s*\([^)]*\)/g,'').replace(/\s+/g,' ').trim();const sents=txt.match(/[^.!?]+[.!?]+/g)||[];e.textContent=sents.slice(0,2).join(' ').trim();if(!e.textContent)e.remove()}).catch(()=>{});else{const e=$('#bbio');e&&e.remove()}
 if(S.settings.tm)concertsFor(a.name).then(cs=>{const e=$('#bgig');if(!e)return;const it=cs.filter(c=>c.cc==='IT'&&c.date>=t);const all=cs.filter(c=>c.date>=t);
 e.className='';e.innerHTML=it.length?`<b style="font-weight:600">${esc(it[0].city)}</b> <span class="muted">· ${fmtDate(it[0].date)}${it.length>1?` · e altre ${it.length-1} date in Italia`:''}</span>`:all.length?`<span class="muted">Nessuna data in Italia · ${all.length} all'estero</span>`:'<span class="muted">Nessun concerto annunciato</span>'})}
