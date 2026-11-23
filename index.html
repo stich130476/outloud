@@ -280,7 +280,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.34';
+const VER='1.35';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -842,8 +842,7 @@ app.innerHTML=`<a class="iconbtn back" href="#home">${I.back}</a><div style="pad
 <div class="card" style="margin-top:14px"><h3 style="font-size:19px">Backup</h3><p class="small muted" style="line-height:1.5;margin:6px 0 0">Ogni notte GitHub salva una copia di tutti i tuoi dati (una sola, che si aggiorna). Se i dati sembrano svuotati, il backup non viene toccato.</p><div id="bkinfo" class="small" style="margin-top:8px;color:var(--gold)"></div>
 <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">${K.gh?'<button class="btn sm" onclick="restoreBackup()">Ripristina il backup</button>':''}<button class="btn sm ghost" onclick="exportData()">Esporta</button><label class="btn sm ghost">Importa<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label></div></div>
 <div class="sign">OutLoud! ${VER}<br>Stefano Fasolato 🖤💙</div></div>`;setTimeout(backupInfo,0)}
-async function ghFile(name){const r=await fetch(`https://api.github.com/repos/${K.ghUser}/${K.ghRepo}/contents/${name}?t=${Date.now()}`,{headers:ghH(),cache:'no-store'});if(!r.ok)return null;const j=await r.json();
-const txt=j.content?new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g,'')),c=>c.charCodeAt(0))):await (await fetch(j.download_url)).text();return JSON.parse(txt)}
+async function ghFile(name){const r=await fetch(`https://api.github.com/repos/${K.ghUser}/${K.ghRepo}/contents/${name}?t=${Date.now()}`,{headers:{Authorization:'Bearer '+K.gh,Accept:'application/vnd.github.raw+json'},cache:'no-store'});if(!r.ok)return null;return JSON.parse(await r.text())}
 async function backupInfo(){const e=$('#bkinfo');if(!e||!K.gh)return;try{const b=await ghFile('backup.json');if(!e.isConnected)return;e.textContent=b?`Ultimo backup: ${new Date(b.backupAt).toLocaleString('it-IT',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})} · ${Object.keys(b.artists||{}).length} artisti, ${Object.values(b.albums||{}).filter(v=>v.cd).length} CD`:'Il primo backup arriva stanotte'}catch(x){}}
 window.restoreBackup=async function(){if(!confirm('Ripristino i dati dal backup notturno? Quello che hai cambiato dopo il backup andrà perso.'))return;
 try{const b=await ghFile('backup.json');if(!b)return toast('Nessun backup trovato');delete b.backupAt;S=Object.assign(blank(),b);S.updatedAt=Date.now();S.del={};localStorage.setItem(LS,JSON.stringify(S));
