@@ -288,7 +288,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.39';
+const VER='1.40';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -923,8 +923,10 @@ window.checkNews=checkNews;window.go=go;window.I=I;
 
 /* ---------- INTRO ---------- */
 function eqHTML(n,cls=''){return `<div class="eq ${cls}">${Array.from({length:n},(_,i)=>`<b style="animation-delay:${(-(i*137)%900)}ms;animation-duration:${700+((i*53)%500)}ms"></b>`).join('')}</div>`}
-function introCovers(){const mine=Object.entries(S.albums).filter(([,v])=>v.cd).map(([id])=>caa(id,250));
-let urls=[...new Set([...wallL,...mine])].sort(()=>Math.random()-.5);return urls.slice(0,80)}
+function introCovers(){const seen=new Set(),out=[];const key=u=>{const m=String(u).match(/release-group\/([0-9a-f-]{36})/);return m?'rg:'+m[1]:u.replace(/\/\d+x\d+-[^/]*$/,'').replace(/[?#].*$/,'')};
+const add=u=>{if(!u||u==='-')return;const k=key(u);if(seen.has(k))return;seen.add(k);out.push(u)};
+Object.entries(S.albums).filter(([,v])=>v.cd).forEach(([id])=>{if(covMap[id]==='-')return;seen.has('rg:'+id)||(seen.add('rg:'+id),out.push(covMap[id]||caa(id,250)))});
+wallL.forEach(add);return out.sort(()=>Math.random()-.5)}
 function intro(){const el=$('#intro');let done=false;const hide=()=>{if(done)return;done=true;el.classList.add('hide');setTimeout(()=>el.style.display='none',1000)};
 if(sessionStorage.getItem('ol-intro')){el.style.display='none';return}sessionStorage.setItem('ol-intro',1);
 $('#ienter').onclick=hide;
@@ -933,7 +935,7 @@ $('#ieq').outerHTML=eqHTML(22);
 const na=Object.keys(S.artists).length,nc=Object.values(S.albums).filter(v=>v.cd).length,nn=Object.values(S.seen||{}).filter(v=>v==='new').length;
 $('#istats').textContent=na||nc?`${na} artisti · ${nc} CD${nn?' · '+nn+' novità':''}`:'';
 const urls=introCovers();
-if(urls.length){const rows=5,per=Math.max(8,Math.ceil(urls.length/rows));let html='';for(let r=0;r<rows;r++){const seg=[];for(let i=0;i<per;i++)seg.push(urls[(r*per+i+r*3)%urls.length]);const imgs=seg.map(u=>`<img src="${esc(u)}" decoding="async" style="opacity:0;transition:opacity .5s" onload="this.style.opacity=1" onerror="this.style.visibility='hidden'" alt="">`).join('');html+=`<div class="wrow ${r%2?'rev':''}" style="animation-duration:${60+r*12}s">${imgs}${imgs}</div>`}
+if(urls.length){const rows=5,per=Math.max(innerWidth>800?16:10,Math.min(18,Math.floor(urls.length/rows)));let html='';for(let r=0;r<rows;r++){const seg=[];for(let i=0;i<per;i++)seg.push(urls[(r*per+i)%urls.length]);const imgs=seg.map(u=>`<img src="${esc(u)}" decoding="async" style="opacity:0;transition:opacity .5s" onload="this.style.opacity=1" onerror="this.style.visibility='hidden'" alt="">`).join('');html+=`<div class="wrow ${r%2?'rev':''}" style="animation-duration:${60+r*12}s">${imgs}${imgs}</div>`}
 $('#wall').innerHTML=html;$('#wall').classList.add('on')}}
 
 /* ---------- avvio ---------- */
