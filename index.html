@@ -226,6 +226,14 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 @keyframes bar{0%{height:12%}100%{height:100%}}
 #intro .eq{opacity:0;animation:fadeup .8s 1.2s forwards}
 #intro p{color:#b5ad9d;letter-spacing:.38em;text-transform:uppercase;font-size:11px;margin-top:18px;opacity:0;animation:fadeup .9s 1.5s forwards}
+#intro .ienter{margin-top:34px;padding:15px 50px;border-radius:99px;font:700 17px var(--sans);color:#1a130a;background:linear-gradient(120deg,#fff1c9,#e2bb6a 55%,#b38a3e);box-shadow:0 14px 40px rgba(214,179,106,.35);opacity:0;animation:fadeup .9s 1.8s forwards}
+#intro .ienter:active{transform:scale(.96)}
+#intro .istats{margin-top:18px;color:#8f887b;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:0;animation:fadeup .9s 2.1s forwards}
+#intro .ctr{display:flex;flex-direction:column;align-items:center}
+body.day #intro{background:#f3ece0}
+body.day #intro .vig{background:radial-gradient(ellipse at 50% 50%,rgba(243,236,224,.35) 0,rgba(243,236,224,.78) 45%,#f3ece0 88%)}
+body.day #intro p{color:#7a7266}body.day #intro .istats{color:#8a7f6d}
+body.day .wrow img{filter:saturate(.9) brightness(1)}
 #intro .skip{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 26px);left:0;right:0;text-align:center;color:#6f6a60;font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:0;animation:fadeup .8s 2.2s forwards}
 .brandrow{display:flex;align-items:flex-end;gap:10px}
 .eq.mini{height:22px;gap:3px;margin:0 0 6px}.eq.mini b{width:3.5px}
@@ -234,12 +242,12 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 </head>
 <body>
 <div id="intro"><div class="wall" id="wall"></div><div class="beams"><i></i><i></i></div><div class="vig"></div>
-<div class="ctr"><div class="logo"><span class="lo-out">OUT</span><span class="lo-loud" id="ilogo"></span></div><div class="eq" id="ieq"></div><p>la tua musica, ad alta voce</p></div><div class="skip">tocca per entrare</div></div>
+<div class="ctr"><div class="logo"><span class="lo-out">OUT</span><span class="lo-loud" id="ilogo"></span></div><div class="eq" id="ieq"></div><p>la tua musica, ad alta voce</p><button class="ienter" id="ienter">Entra</button><div class="istats" id="istats"></div></div></div>
 <div id="app"></div>
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.29';
+const VER='1.30';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -832,17 +840,18 @@ window.checkNews=checkNews;window.go=go;window.I=I;
 
 /* ---------- INTRO ---------- */
 function eqHTML(n,cls=''){return `<div class="eq ${cls}">${Array.from({length:n},(_,i)=>`<b style="animation-delay:${(-(i*137)%900)}ms;animation-duration:${700+((i*53)%500)}ms"></b>`).join('')}</div>`}
-async function introCovers(){let urls=wallL.slice().sort(()=>Math.random()-.5);
-if(urls.length<24){try{const d=await Promise.race([dz('chart/0/albums?limit=60'),sleep(1200).then(()=>null)]);if(d&&d.data)urls=urls.concat(d.data.map(a=>a.cover_medium).filter(Boolean))}catch(e){}}
-return urls.slice(0,72)}
-async function intro(){const el=$('#intro');let done=false;const hide=()=>{if(done)return;done=true;el.classList.add('hide');setTimeout(()=>el.style.display='none',1000)};el.onclick=hide;el.addEventListener('touchend',e=>{e.preventDefault();hide()},{passive:false});el.style.cursor='pointer';
+function introCovers(){const mine=Object.entries(S.albums).filter(([,v])=>v.cd).map(([id])=>caa(id,250));
+let urls=[...new Set([...wallL,...mine])].sort(()=>Math.random()-.5);return urls.slice(0,80)}
+function intro(){const el=$('#intro');let done=false;const hide=()=>{if(done)return;done=true;el.classList.add('hide');setTimeout(()=>el.style.display='none',1000)};
 if(sessionStorage.getItem('ol-intro')){el.style.display='none';return}sessionStorage.setItem('ol-intro',1);
+$('#ienter').onclick=hide;
 $('#ilogo').innerHTML=[...'Loud!'].map((c,i)=>`<span style="animation-delay:${150+i*110}ms">${c}</span>`).join('');
 $('#ieq').outerHTML=eqHTML(22);
-const urls=await introCovers();
-if(urls.length){const rows=4,per=Math.max(8,Math.ceil(urls.length/rows));let html='';for(let r=0;r<rows;r++){const seg=[];for(let i=0;i<per;i++)seg.push(urls[(r*per+i)%urls.length]);const imgs=seg.map(u=>`<img src="${esc(u)}" style="opacity:0;transition:opacity .6s" onload="this.style.opacity=1" onerror="this.remove()" alt="">`).join('');html+=`<div class="wrow ${r%2?'rev':''}" style="animation-duration:${60+r*12}s">${imgs}${imgs}</div>`}
-$('#wall').innerHTML=html;requestAnimationFrame(()=>$('#wall').classList.add('on'))}
-setTimeout(hide,4300)}
+const na=Object.keys(S.artists).length,nc=Object.values(S.albums).filter(v=>v.cd).length,nn=Object.values(S.seen||{}).filter(v=>v==='new').length;
+$('#istats').textContent=na||nc?`${na} artisti · ${nc} CD${nn?' · '+nn+' novità':''}`:'';
+const urls=introCovers();
+if(urls.length){const rows=5,per=Math.max(8,Math.ceil(urls.length/rows));let html='';for(let r=0;r<rows;r++){const seg=[];for(let i=0;i<per;i++)seg.push(urls[(r*per+i+r*3)%urls.length]);const imgs=seg.map(u=>`<img src="${esc(u)}" decoding="async" style="opacity:0;transition:opacity .5s" onload="this.style.opacity=1" onerror="this.style.visibility='hidden'" alt="">`).join('');html+=`<div class="wrow ${r%2?'rev':''}" style="animation-duration:${60+r*12}s">${imgs}${imgs}</div>`}
+$('#wall').innerHTML=html;$('#wall').classList.add('on')}}
 
 /* ---------- avvio ---------- */
 applyTheme();try{fixWrapped()}catch(e){}intro();render();
