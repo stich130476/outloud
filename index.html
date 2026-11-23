@@ -248,6 +248,12 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 .wposter.big{grid-column:span 2;aspect-ratio:2/1}
 .wposter.big .lab div:nth-child(2){font-size:34px!important}
 @media(min-width:700px){.wposter.big{grid-row:span 2;aspect-ratio:1}.wposter.big .lab div:nth-child(2){font-size:46px!important}}
+/* in breve */
+.btab{display:grid;grid-template-columns:auto 1fr;gap:0 16px;margin-top:10px}
+.btab .bk,.btab .bv{padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.btab .bk{color:var(--mu);font-size:12.5px;white-space:nowrap}
+.btab .bv{min-width:0}
+@media(min-width:800px){.brief{display:grid;grid-template-columns:1fr 1.2fr;gap:0 28px;align-items:start}.brief>div:first-child{grid-column:1/-1}.brief .btab{margin-top:6px}}
 /* priorità in colonne */
 .pgrid{display:grid;grid-template-columns:1fr;gap:0 22px}
 .pcol{min-width:0}
@@ -280,7 +286,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.36';
+const VER='1.37';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -547,10 +553,11 @@ app.innerHTML=`<a class="iconbtn back" href="javascript:history.back()">${I.back
 ${S.artists[mbid]?`<button class="btn sm ${S.artists[mbid].prio?'':'ghost'}" onclick="togglePrio('${mbid}');render()">${S.artists[mbid].prio?'★ Prioritario':'☆ Metti in priorità'}</button>`:''}<a class="btn sm" target="_blank" href="https://open.spotify.com/search/${enc(a.name)}">Ascolta su Spotify</a>
 <a class="btn sm ghost" target="_blank" href="https://www.setlist.fm/search?query=${enc(a.name)}">Scalette</a><a class="btn sm ghost" target="_blank" href="https://www.ticketone.it/search/?searchterm=${enc(a.name)}">TicketOne</a>
 ${site?`<a class="btn sm ghost" target="_blank" href="${esc(site.url.resource)}">Sito ufficiale</a>`:''}</div>
-<div class="tabs" id="atabs"></div><div id="abody">${loading}</div>`;
+<div id="brief"></div><div class="tabs" id="atabs"></div><div id="abody">${loading}</div>`;
 artistPhoto(a.name).then(u=>{const e=$('#hbg');if(e&&u)e.style.backgroundImage=`url("${u}")`;else if(e&&qid)wikiInfo(qid).then(w=>{if(w.img&&$('#hbg'))$('#hbg').style.backgroundImage=`url("${w.img}")`}).catch(()=>{})});
 let disc=[];try{disc=await discography(mbid)}catch(e){}if(!ok())return;
 const members=(a.relations||[]).filter(r=>r.type==='member of band'&&r.direction==='backward');
+briefHTML(a,disc,members,by,ey,qid,mbid);
 const memberOf=(a.relations||[]).filter(r=>r.type==='member of band'&&r.direction==='forward');
 const T=[['disc','Discografia'],['top','Brani migliori'],['sim','Artisti simili'],members.length?['form','Formazione']:memberOf.length?['form','Gruppi']:null,['bio','Biografia'],['num','In cifre'],['live','Concerti']].filter(Boolean);
 let cur='disc';
@@ -568,6 +575,25 @@ B.innerHTML=L.length?`<p class="small muted" style="margin:14px 0 4px">I 20 bran
 else if(cur==='live'){if(!S.settings.tm){B.innerHTML=`<div class="card small muted">Per vedere i concerti inserisci la chiave Ticketmaster nelle <a style="color:var(--gold)" href="#impostazioni">Impostazioni</a>.</div>`;return}B.innerHTML=loading;const cs=await concertsFor(a.name);if(cur!=='live')return;
 const it=cs.filter(c=>c.cc==='IT'),w=cs.filter(c=>c.cc!=='IT');B.innerHTML=(cs.length?`${it.length?`<div class="sec"><h2>🇮🇹 In Italia</h2></div>${it.map(concertRow).join('')}`:''}${w.length?`<div class="sec"><h2>Nel mondo</h2></div>${w.map(concertRow).join('')}`:''}`:'<div class="card muted small">Nessun concerto annunciato al momento.</div>')}};
 draw()}
+function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
+const real=disc.filter(r=>r.d);const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
+const fut=pick(r=>r.d>t).reverse()[0];const alb=pick(r=>r.d<=t&&typeOf(r)==='Album')[0];const sng=pick(r=>r.d<=t&&(typeOf(r)==='Singolo'||typeOf(r)==='EP'))[0];
+const cur=[...new Set(members.filter(r=>!r.ended&&!r.end).map(r=>r.artist.name))];
+const link=r=>r?`<a href="#album/${r.id}" style="color:var(--tx)"><b style="font-weight:600">${esc(r.t)}</b> <span class="muted">· ${fmtDate(r.d)}</span></a>`:'<span class="muted">—</span>';
+const rows=[
+[a.type==='Group'?'Gruppo':'Artista',`${esc(a.name)}${a.area?.name?` <span class="muted">· ${esc(a.area.name)}</span>`:''}${by?` <span class="muted">· dal ${by}${ey?' al '+ey:''}</span>`:''}`],
+cur.length?['Formazione',esc(cur.join(', '))]:null,
+['Prossima uscita',fut?`${link(fut)} ${whenBadge(fut.d)}`:'<span class="muted">Nessuna annunciata</span>'],
+['Ultimo album',link(alb)],
+['Ultimo singolo',link(sng)],
+['Concerti',S.settings.tm?'<span id="bgig" class="muted">cerco…</span>':`<a target="_blank" style="color:var(--gold)" href="https://www.ticketone.it/search/?searchterm=${enc(a.name)}">Cerca su TicketOne →</a>`],
+['Notizie e rumors',`<a target="_blank" style="color:var(--gold)" href="https://news.google.com/search?q=${enc('"'+a.name+'"')}&hl=it&gl=IT&ceid=IT:it">Le ultime notizie →</a>`]].filter(Boolean);
+B.innerHTML=`<div class="card brief" style="margin-top:18px"><div style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase">In breve</div>
+<p id="bbio" class="bio" style="margin:8px 0 4px;font-size:15px;line-height:1.55;font-family:var(--serif)"></p>
+<div class="btab">${rows.map(([k,v])=>`<div class="bk">${k}</div><div class="bv">${v}</div>`).join('')}</div></div>`;
+if(qid)wikiInfo(qid).then(w=>{const e=$('#bbio');if(!e)return;const txt=(w.text||'').replace(/\s*\([^)]*\)/g,'').replace(/\s+/g,' ').trim();const sents=txt.match(/[^.!?]+[.!?]+/g)||[];e.textContent=sents.slice(0,2).join(' ').trim();if(!e.textContent)e.remove()}).catch(()=>{});else{const e=$('#bbio');e&&e.remove()}
+if(S.settings.tm)concertsFor(a.name).then(cs=>{const e=$('#bgig');if(!e)return;const it=cs.filter(c=>c.cc==='IT'&&c.date>=t);const all=cs.filter(c=>c.date>=t);
+e.className='';e.innerHTML=it.length?`<b style="font-weight:600">${esc(it[0].city)}</b> <span class="muted">· ${fmtDate(it[0].date)}${it.length>1?` · e altre ${it.length-1} date in Italia`:''}</span>`:all.length?`<span class="muted">Nessuna data in Italia · ${all.length} all'estero</span>`:'<span class="muted">Nessun concerto annunciato</span>'})}
 function discHTML(disc,artist){if(!disc.length)return'<div class="card muted">Discografia non disponibile.</div>';
 const groups=['Album','EP','Singolo','Live','Raccolta','Colonna sonora','Remix','Demo','Altro'];const by={};disc.forEach(r=>(by[typeOf(r)]=by[typeOf(r)]||[]).push(r));
 const present=groups.filter(g=>by[g]);if(disc.length)present.push('Tutta');by['Tutta']=disc;const id='dd'+Math.random().toString(36).slice(2);
