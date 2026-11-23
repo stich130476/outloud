@@ -297,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.48';
+const VER='1.49';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -657,6 +657,9 @@ const albP=pool(['album']),sngP=pool(['single','ep']);
 const RAC=/\b(best of|greatest|hits|collection|anthology|essentials|b-sides|rarities|the very best|singles)\b/i,LIV=/\b(live|unplugged|in concert|dal vivo|en vivo)\b/i;
 const pool2=(re)=>agreed(srcs(x=>x.k==='album'&&re.test(x.t)),x=>!!x.d);
 const out={alb:newer(pick(albP,0),mb.alb),sng:newer(pick(sngP,0),mb.sng),rac:newer(pick(pool2(RAC),0),mb.rac),liv:newer(pick(pool2(LIV),0),mb.liv)};const f=pick([...albP,...sngP],1);out.fut=f&&(!mb.fut||f.d<mb.fut.d)?f:null;
+const S3=srcs(x=>['album','single','ep'].includes(x.k));const conf=new Set([...albP,...sngP].map(x=>norm(baseTitle(x.t))));const lastOff=[mb.alb,mb.sng,out.alb,out.sng].filter(Boolean).map(x=>x.d).sort().pop()||'0';
+const rum={};[...S3.dz,...S3.am,...S3.sp].filter(x=>ok(x)&&!known(x)&&x.d>lastOff&&!conf.has(norm(baseTitle(x.t)))).forEach(x=>{const k=norm(baseTitle(x.t));(rum[k]=rum[k]||{...x,srcs:new Set()}).srcs.add(x.src)});
+out.rum=Object.values(rum).filter(x=>x.srcs.size===1).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,2).map(x=>({...x,srcs:[...x.srcs]}));
 const dzm=x=>x&&(D.find(y=>norm(baseTitle(y.t))===norm(baseTitle(x.t)))||{}).dz;['alb','sng','fut','rac','liv'].forEach(k=>{if(out[k]&&!out[k].dz)out[k].dz=dzm(out[k])});return out}
 function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
 const real=disc.filter(r=>r.d&&!NOTSTUDIO.test(r.t));const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
@@ -685,7 +688,9 @@ const fill=r=>{if(!$('#brief'))return;r=r||{};
 const cell=(lab,x,empty,badge)=>{const k=[...document.querySelectorAll('#brief .bk')].find(e=>e.textContent===lab);if(!k)return;const v=k.nextElementSibling;
 if(!x){v.innerHTML=`<span class="muted">${empty}</span>`;return}const m=disc.find(q=>q.id===x.id)||disc.find(q=>norm(q.t)===norm(x.t));const href=m?`#album/${m.id}`:(x.dz?`https://www.deezer.com/album/${x.dz}`:'');
 v.innerHTML=`<a ${href&&!href.startsWith('#')?'target="_blank"':''} href="${href||'javascript:void 0'}" style="color:var(--tx)"><b style="font-weight:600">${esc(x.t)}</b> <span class="muted">· ${fmtDate(x.d)}</span></a>${badge?' '+whenBadge(x.d):''}`};
-cell('Prossima uscita',r.fut||fut,'Nessuna annunciata',1);cell('Ultimo album ufficiale',r.alb||alb,'—');cell('Ultimo singolo ufficiale',r.sng||sng,'—');cell('Ultima raccolta',r.rac||rac,'Nessuna');cell('Ultimo live',r.liv||liv,'Nessuno')};
+cell('Prossima uscita',r.fut||fut,'Nessuna annunciata',1);
+if(r.rum&&r.rum.length){const k=[...document.querySelectorAll('#brief .bk')].find(e=>e.textContent==='Notizie e rumors');const SN={dz:'Deezer',am:'Apple Music',sp:'Spotify'};
+if(k)k.nextElementSibling.insertAdjacentHTML('afterbegin',r.rum.map(x=>`<div style="margin-bottom:6px"><span class="badge out" style="margin-right:6px">Rumor</span><b style="font-weight:600">${esc(x.t)}</b> <span class="muted">· ${fmtDate(x.d)} · solo su ${SN[x.srcs[0]]}, da confermare</span></div>`).join(''))}cell('Ultimo album ufficiale',r.alb||alb,'—');cell('Ultimo singolo ufficiale',r.sng||sng,'—');cell('Ultima raccolta',r.rac||rac,'Nessuna');cell('Ultimo live',r.liv||liv,'Nessuno')};
 let filled=false;const to=setTimeout(()=>{if(!filled){filled=true;fill(null)}},9000);
 releaseCheck(a.name,disc,{alb,sng,fut,rac,liv}).then(r=>{if(filled)return;filled=true;clearTimeout(to);fill(r)}).catch(()=>{if(!filled){filled=true;fill(null)}});
 if(qid)wikiInfo(qid).then(w=>{const e=$('#bbio');if(!e)return;const txt=(w.text||'').replace(/\s*\([^)]*\)/g,'').replace(/\s+/g,' ').trim();const sents=txt.match(/[^.!?]+[.!?]+/g)||[];e.textContent=sents.slice(0,2).join(' ').trim();if(!e.textContent)e.remove()}).catch(()=>{});else{const e=$('#bbio');e&&e.remove()}
