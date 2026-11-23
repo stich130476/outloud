@@ -297,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.58';
+const VER='1.59';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -906,16 +906,16 @@ if(tr.length){const w=S.wrapped[y]||(S.wrapped[y]={});w.pl=tr;w.plName=p.name;w.
 if(found)save();return found}
 let spWr=[],spWrErr=[];
 /* Cronologia completa dall'esportazione dati di Spotify */
-window.importHistory=async function(inp){const files=[...inp.files];if(!files.length)return;toast('Analizzo la cronologia…');const Y={};let rows=0;
+window.importHistory=async function(inp){const files=[...inp.files];if(!files.length)return;toast('Analizzo la cronologia…');const Y={};let rows=0;const PL={};
 for(const f of files){let d;try{d=JSON.parse(await f.text())}catch(e){continue}if(!Array.isArray(d))continue;
 for(const r of d){const ms=r.ms_played??r.msPlayed??0;const t=r.master_metadata_track_name??r.trackName;const a=r.master_metadata_album_artist_name??r.artistName;const al=r.master_metadata_album_album_name||'';const ts=r.ts||r.endTime||'';if(!t||!a||!ts)continue;
-const y=ts.slice(0,4);const o=Y[y]||(Y[y]={ms:0,plays:0,A:{},T:{},AL:{},days:new Set()});o.ms+=ms;rows++;if(ms<30000)continue;o.plays++;o.days.add(ts.slice(0,10));
+const y=ts.slice(0,4);const o=Y[y]||(Y[y]={ms:0,plays:0,A:{},T:{},AL:{},days:new Set()});o.ms+=ms;rows++;if(ms<30000)continue;{const pk=norm(baseTitle(t))+'|'+norm(a);PL[pk]=(PL[pk]||0)+1}o.plays++;o.days.add(ts.slice(0,10));
 (o.A[a]=o.A[a]||{n:a,ms:0,p:0});o.A[a].ms+=ms;o.A[a].p++;const tk=t+'\u0001'+a;(o.T[tk]=o.T[tk]||{t,a,ms:0,p:0});o.T[tk].ms+=ms;o.T[tk].p++;
 if(al){const ak=al+'\u0001'+a;(o.AL[ak]=o.AL[ak]||{t:al,a,ms:0,p:0});o.AL[ak].ms+=ms;o.AL[ak].p++}}}
 if(!rows){toast('File non riconosciuti');return}S.wrapped=S.wrapped||{};const top=(o,k)=>Object.values(o).sort((x,y)=>y[k]-x[k]).slice(0,30);
 for(const[y,o]of Object.entries(Y)){const w=S.wrapped[y]||(S.wrapped[y]={});w.min=Math.round(o.ms/60000);w.plays=o.plays;w.days=o.days.size;w.nart=Object.keys(o.A).length;w.ntr=Object.keys(o.T).length;
 w.art=top(o.A,'ms').map(x=>({n:x.n,min:Math.round(x.ms/60000),p:x.p}));w.tr=top(o.T,'p').map(x=>({t:x.t,a:x.a,p:x.p}));w.alb=top(o.AL,'ms').slice(0,15).map(x=>({t:x.t,a:x.a,min:Math.round(x.ms/60000)}))}
-save();toast(`Fatto: ${Object.keys(Y).length} anni di ascolti`);coltab='w';go('collezione');render()};
+const keep={};Object.entries(PL).forEach(([k,v])=>{if(v>=3)keep[k]=v});idb.set('plays',keep);S.playsAt=Date.now();save();toast(`Fatto: ${Object.keys(Y).length} anni di ascolti`);coltab='w';go('collezione');render()};
 function vWrapped(y){const w=(S.wrapped||{})[y];if(!w)return;const T=wrTracks(w);const one=T[0];
 const tile=(x,cls='wtile')=>x?`<div class="${cls} ${x.img?'ok':''}" ${x.img?`style="background-image:url('${esc(x.img)}')"`:`data-tc='${esc(JSON.stringify([x.a,x.t]))}'`}></div>`:'<div class="wtile"></div>';
 const row=(t,i)=>`<div class="trk"><span class="no" style="font-family:var(--serif);font-size:${i<3?19:14}px;color:${i<3?'var(--gold)':'var(--mu)'};width:24px">${i+1}</span><div style="width:44px;height:44px;border-radius:6px;overflow:hidden;flex:none">${tile(t,'wtile')}</div><span class="tt">${esc(t.t)}<br><span class="small muted">${esc(t.a)}${t.p?' · '+t.p+' ascolti':''}</span></span><button class="play" data-a="${esc(t.a.split(', ')[0])}" data-t="${esc(t.t)}" onclick="playPrev(this)">${I.play}</button>${spBtn(t.a.split(', ')[0],t.t)}</div>`;
@@ -936,11 +936,11 @@ if(id)location.href=`https://open.spotify.com/playlist/${id}`;else{toast(K.spRef
 function allWrapped(){const W=Object.entries(S.wrapped||{});const M={};
 W.forEach(([y,w])=>(w.pl||w.tr||[]).forEach((t,i)=>{const k=norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]);if(!k||k==='|')return;const o=M[k]||(M[k]={t:t.t,a:t.a,img:t.img||'',u:t.u||'',ry:t.ry||'',years:[],best:999});if(!o.ry&&t.ry)o.ry=t.ry;if(!o.years.includes(y))o.years.push(y);o.best=Math.min(o.best,i);if(!o.u&&t.u)o.u=t.u;if(!o.img&&t.img)o.img=t.img}));
 return Object.values(M).sort((a,b)=>b.years.length-a.years.length||a.best-b.best)}
-window.vAllWrapped=function(){const L=allWrapped();const sh=sheet(`<div style="color:var(--gold);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11px">Tutti i miei Wrapped</div><h1 style="font-size:34px;margin:4px 0 6px">${L.length} brani</h1>
-<p class="small muted" style="line-height:1.5;margin:0 0 12px">Tutti i brani di tutte le tue playlist Wrapped, una volta sola. In cima quelli presenti in più anni.</p>
+window.vAllWrapped=async function(){const L=allWrapped();const PLS=(await idb.get('plays'))||null;if(PLS)L.forEach(t=>{t.pc=PLS[norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0])]||0});const sh=sheet(`<div style="color:var(--gold);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11px">Tutti i miei Wrapped</div><h1 style="font-size:34px;margin:4px 0 6px">${L.length} brani</h1>
+<p class="small muted" style="line-height:1.5;margin:0 0 12px">Tutti i brani di tutte le tue playlist Wrapped, una volta sola. In cima quelli presenti in più anni.${PLS?' Gli ascolti vengono dalla tua cronologia Spotify.':' Per vedere quante volte hai ascoltato ogni brano carica la cronologia Spotify in "I miei anni".'}</p>
 <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="spsync" style="background:#1ed760;color:#0b2414">${S.settings.allPl?'Aggiorna su Spotify':'Crea su Spotify'}</button>${S.settings.allPl?`<a class="btn ghost" href="https://open.spotify.com/playlist/${S.settings.allPl}">Apri la playlist</a>`:''}<button class="btn ghost" id="cplist">Copia l'elenco</button>${S.settings.allPl?'<button class="btn ghost" id="spver">✓ Verifica</button>':''}</div>
 <div id="spst" class="small muted" style="margin-top:8px"></div>
-<div style="margin-top:10px">${L.map((t,i)=>{const yy=t.years.filter(y=>y!=='sempre').sort();const nw=t.years.length;return `<div class="trk" data-k="${esc(norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]))}"><span class="no">${i+1}</span><span class="tt">${esc(t.t)}<br><span class="small muted">${esc(t.a)}</span><br><span class="small" style="color:var(--gold);font-weight:600">In ${nw} Wrapped</span><span class="small muted"> · ${[...yy,...(t.years.includes('sempre')?['Di sempre']:[])].join(', ')}</span></span><span class="ry" data-ry='${esc(JSON.stringify([(t.a||'').split(', ')[0],t.t]))}' style="text-align:right;min-width:52px"><span class="small muted" style="display:block;font-size:10px">uscito</span><b style="font-family:var(--serif);font-size:17px;font-weight:600">${t.ry||'…'}</b></span>${spBtn((t.a||'').split(', ')[0],t.t)}</div>`}).join('')}</div>`);
+<div style="margin-top:10px">${L.map((t,i)=>{const yy=t.years.filter(y=>y!=='sempre').sort();const nw=t.years.length;return `<div class="trk" data-k="${esc(norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]))}"><span class="no">${i+1}</span><span class="tt">${esc(t.t)}<br><span class="small muted">${esc(t.a)}</span><br>${t.pc?`<span class="small" style="color:#1ed760;font-weight:700">▶ ${t.pc.toLocaleString('it-IT')} ascolti</span><span class="small muted"> · </span>`:''}<span class="small" style="color:var(--gold);font-weight:600">In ${nw} Wrapped</span><span class="small muted"> · ${[...yy,...(t.years.includes('sempre')?['Di sempre']:[])].join(', ')}</span></span><span class="ry" data-ry='${esc(JSON.stringify([(t.a||'').split(', ')[0],t.t]))}' style="text-align:right;min-width:52px"><span class="small muted" style="display:block;font-size:10px">uscito</span><b style="font-family:var(--serif);font-size:17px;font-weight:600">${t.ry||'…'}</b></span>${spBtn((t.a||'').split(', ')[0],t.t)}</div>`}).join('')}</div>`);
 $('#cplist',sh).onclick=()=>{navigator.clipboard.writeText(L.map(t=>`${t.a} - ${t.t}`).join('\n')).then(()=>toast('Elenco copiato')).catch(()=>toast('Copia non riuscita'))};
 $('#spsync',sh).onclick=()=>syncAllWrapped(L,$('#spst',sh));fillYears(sh);const vb=$('#spver',sh);if(vb)vb.onclick=()=>verifyAllWrapped(L,sh)};
 async function verifyAllWrapped(L,sh){const st=$('#spst',sh);const tok=await spToken();if(!tok)return toast('Collega Spotify');const H={Authorization:'Bearer '+tok};const id=S.settings.allPl;st.textContent='Controllo la playlist su Spotify…';
