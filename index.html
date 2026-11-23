@@ -297,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.51';
+const VER='1.52';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -901,7 +901,7 @@ go('home');render();checkNews(true)}};draw()}
 async function spWrapped(get){let u='https://api.spotify.com/v1/me/playlists?limit=50',n=0,found=0;S.wrapped=S.wrapped||{};
 while(u&&n<10){const j=await get(u);for(const p of j.items||[]){if(!p)continue;let m=(p.name||'').match(/(top songs|brani preferiti|canzoni preferite|wrapped)\D*((19|20)\d\d)/i);let y;if(m)y=m[2];else if(/(wrapped|top songs|brani preferiti|canzoni preferite|più ascoltati)/i.test(p.name||'')&&!/(19|20)\d\d/.test(p.name||''))y='sempre';else continue;
 let items=[];for(const ep of['items','tracks']){try{const k=await get(`https://api.spotify.com/v1/playlists/${p.id}/${ep}?limit=100`);items=k.items||[];break}catch(e){}}
-const tr=items.map(x=>x.item||x.track).filter(Boolean).map(t=>({u:t.uri||'',t:t.name,a:(t.artists||[]).map(a=>a.name).join(', '),al:t.album?.name||'',img:(t.album?.images||[]).slice(-2)[0]?.url||''}));
+const tr=items.map(x=>x.item||x.track).filter(Boolean).map(t=>({u:t.uri||'',ry:(t.album?.release_date||'').slice(0,4),t:t.name,a:(t.artists||[]).map(a=>a.name).join(', '),al:t.album?.name||'',img:(t.album?.images||[]).slice(-2)[0]?.url||''}));
 if(tr.length){const w=S.wrapped[y]||(S.wrapped[y]={});w.pl=tr;w.plName=p.name;w.plId=p.id;w.u=Date.now();found++;spWr.push(y)}else spWrErr.push(p.name)}u=j.next;n++}
 if(found)save();return found}
 let spWr=[],spWrErr=[];
@@ -934,15 +934,20 @@ if(!id&&w.plName){const tok=await spToken();if(tok){try{let u='https://api.spoti
 if(id){w.plId=id;save()}}catch(e){}}}
 if(id)location.href=`https://open.spotify.com/playlist/${id}`;else{toast(K.spRef?'Playlist non trovata: la cerco su Spotify':'Collega Spotify per aprirla direttamente');setTimeout(()=>location.href=`https://open.spotify.com/search/${enc(w.plName||('Wrapped '+y))}/playlists`,900)}};
 function allWrapped(){const W=Object.entries(S.wrapped||{});const M={};
-W.forEach(([y,w])=>(w.pl||w.tr||[]).forEach((t,i)=>{const k=norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]);if(!k||k==='|')return;const o=M[k]||(M[k]={t:t.t,a:t.a,img:t.img||'',u:t.u||'',years:[],best:999});o.years.push(y);o.best=Math.min(o.best,i);if(!o.u&&t.u)o.u=t.u;if(!o.img&&t.img)o.img=t.img}));
+W.forEach(([y,w])=>(w.pl||w.tr||[]).forEach((t,i)=>{const k=norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]);if(!k||k==='|')return;const o=M[k]||(M[k]={t:t.t,a:t.a,img:t.img||'',u:t.u||'',ry:t.ry||'',years:[],best:999});if(!o.ry&&t.ry)o.ry=t.ry;o.years.push(y);o.best=Math.min(o.best,i);if(!o.u&&t.u)o.u=t.u;if(!o.img&&t.img)o.img=t.img}));
 return Object.values(M).sort((a,b)=>b.years.length-a.years.length||a.best-b.best)}
 window.vAllWrapped=function(){const L=allWrapped();const sh=sheet(`<div style="color:var(--gold);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11px">Tutti i miei Wrapped</div><h1 style="font-size:34px;margin:4px 0 6px">${L.length} brani</h1>
 <p class="small muted" style="line-height:1.5;margin:0 0 12px">Tutti i brani di tutte le tue playlist Wrapped, una volta sola. In cima quelli presenti in più anni.</p>
 <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="spsync" style="background:#1ed760;color:#0b2414">${S.settings.allPl?'Aggiorna su Spotify':'Crea su Spotify'}</button>${S.settings.allPl?`<a class="btn ghost" href="https://open.spotify.com/playlist/${S.settings.allPl}">Apri la playlist</a>`:''}<button class="btn ghost" id="cplist">Copia l'elenco</button></div>
 <div id="spst" class="small muted" style="margin-top:8px"></div>
-<div style="margin-top:10px">${L.map((t,i)=>`<div class="trk"><span class="no">${i+1}</span><span class="tt">${esc(t.t)}<br><span class="small muted">${esc(t.a)} · ${t.years.map(y=>y==='sempre'?'sempre':y).sort().join(', ')}</span></span>${spBtn((t.a||'').split(', ')[0],t.t)}</div>`).join('')}</div>`);
+<div style="margin-top:10px">${L.map((t,i)=>{const yy=t.years.filter(y=>y!=='sempre').sort();const nw=t.years.length;return `<div class="trk"><span class="no">${i+1}</span><span class="tt">${esc(t.t)}<br><span class="small muted">${esc(t.a)}</span><br><span class="small" style="color:var(--gold);font-weight:600">In ${nw} Wrapped</span><span class="small muted"> · ${[...yy,...(t.years.includes('sempre')?['Di sempre']:[])].join(', ')}</span></span><span class="ry" data-ry='${esc(JSON.stringify([(t.a||'').split(', ')[0],t.t]))}' style="text-align:right;min-width:52px"><span class="small muted" style="display:block;font-size:10px">uscito</span><b style="font-family:var(--serif);font-size:17px;font-weight:600">${t.ry||'…'}</b></span>${spBtn((t.a||'').split(', ')[0],t.t)}</div>`}).join('')}</div>`);
 $('#cplist',sh).onclick=()=>{navigator.clipboard.writeText(L.map(t=>`${t.a} - ${t.t}`).join('\n')).then(()=>toast('Elenco copiato')).catch(()=>toast('Copia non riuscita'))};
-$('#spsync',sh).onclick=()=>syncAllWrapped(L,$('#spst',sh))};
+$('#spsync',sh).onclick=()=>syncAllWrapped(L,$('#spst',sh));fillYears(sh)};
+function trackYear(a,t){return cached('ty:'+a+'|'+t,90*DAY,async()=>{const r=await jsonp(`https://itunes.apple.com/search?term=${enc(a+' '+baseTitle(t))}&entity=song&limit=10&country=it`);
+const L=((r&&r.results)||[]).filter(x=>norm(x.artistName)===norm(a)&&norm(baseTitle(x.trackName))===norm(baseTitle(t))).map(x=>(x.releaseDate||'').slice(0,4)).filter(Boolean).sort();return L[0]||''}).catch(()=>'')}
+function fillYears(root){const els=[...root.querySelectorAll('[data-ry]')].filter(e=>e.querySelector('b').textContent==='…');const q=[];let busy=0;
+const run=()=>{while(busy<3&&q.length){const el=q.shift();if(!el.isConnected)continue;busy++;const [a,t]=JSON.parse(el.dataset.ry);trackYear(a,t).then(y=>{el.querySelector('b').textContent=y||'—'}).finally(()=>{busy--;run()})}};
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);q.push(e.target);run()}}),{root:root.querySelector('.in'),rootMargin:'300px'});els.forEach(el=>io.observe(el))}
 async function syncAllWrapped(L,st){const tok=await spToken();if(!tok||!K.spOk2){toast('Ricollega Spotify per dare il permesso di creare playlist');sessionStorage.setItem('sp-only',1);K.spOk2=1;saveKeys();setTimeout(spLogin,900);return}
 const H={Authorization:'Bearer '+tok,'Content-Type':'application/json'};const say=t=>{if(st)st.textContent=t};
 try{let id=S.settings.allPl;
