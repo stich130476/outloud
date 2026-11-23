@@ -249,9 +249,14 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 .wposter.big .lab div:nth-child(2){font-size:34px!important}
 @media(min-width:700px){.wposter.big{grid-row:span 2;aspect-ratio:1}.wposter.big .lab div:nth-child(2){font-size:46px!important}}
 /* da scoprire */
-.dgrid{display:grid;grid-template-columns:1fr;gap:12px}
-.card.disc{display:flex;gap:14px;align-items:center;padding:12px}
-@media(min-width:800px){.dgrid{grid-template-columns:repeat(3,1fr)}.card.disc{flex-direction:column;align-items:flex-start}.card.disc .cov{width:100%!important}}
+.dgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.dcard{min-width:0}.dcard .cov{position:relative;border-radius:10px}
+.dcard .dp{position:absolute;left:6px;bottom:6px;width:28px;height:28px;background:rgba(0,0,0,.55);color:#fff;backdrop-filter:blur(6px)}
+.dcard .ds{position:absolute;right:6px;bottom:6px}.dcard .ds .play{width:28px;height:28px;background:rgba(0,0,0,.55)!important}
+.dcard .dt{font-family:var(--serif);font-size:13.5px;line-height:1.2;margin-top:7px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dcard .da{display:block;color:var(--gold);font-size:11.5px;font-weight:600;margin-top:2px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dcard .dv{font-size:10.5px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(min-width:800px){.dgrid{grid-template-columns:repeat(3,150px);gap:20px}}
 /* in breve */
 .btab{display:grid;grid-template-columns:auto 1fr;gap:0 16px;margin-top:10px}
 .btab .bk,.btab .bv{padding:9px 0;border-top:1px solid var(--line);font-size:14px}
@@ -292,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.41';
+const VER='1.42';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -604,11 +609,9 @@ const cnt={};tt.forEach(t=>{if(t.album)cnt[t.album]=(cnt[t.album]||0)+1});const 
 out.push({name:c.name,img:c.img,via:c.via,album:alb[0],cover:t0.cover,track:t0.t,prev:t0.prev})}
 if(out.length){try{localStorage.setItem(key,JSON.stringify(out));localStorage.setItem('ol-disc-shown',JSON.stringify([...shown,...out.map(o=>o.name)].slice(-60)));for(let k=0;k<localStorage.length;k++){const kk=localStorage.key(k);if(kk&&kk.startsWith('ol-disc-2')&&kk!==key)localStorage.removeItem(kk)}}catch(e){}}
 return out}
-function discoHTML(L){return `<div class="sec"><h2>Da scoprire oggi</h2><span class="small muted">in base a quello che ascolti</span></div><div class="dgrid">${L.map(d=>`<div class="card disc">
-<div class="cov" style="width:96px;flex:none">${d.cover?`<img src="${esc(d.cover)}" alt="">`:phHTML(d.album)}</div>
-<div style="flex:1;min-width:0"><div style="font-family:var(--serif);font-size:18px;line-height:1.2">${esc(d.album)}</div><button class="small" style="color:var(--gold);font-weight:600;margin-top:3px;text-align:left" onclick='openArtist(${esc(JSON.stringify(d.name))})'>${esc(d.name)} →</button>
-<div class="small muted" style="margin-top:5px;line-height:1.35">Perché ascolti ${d.via.map(esc).join(' e ')}</div>
-<div class="row" style="gap:8px;margin-top:9px"><button class="play" data-u="${esc(d.prev||'')}" data-a="${esc(d.name)}" data-t="${esc(d.track)}" onclick="playPrev(this)">${I.play}</button>${spBtn(d.name,d.album)}<span class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.track)}</span></div></div></div>`).join('')}</div>`}
+function discoHTML(L){return `<div class="sec"><h2>Da scoprire oggi</h2><span class="small muted">per i tuoi gusti</span></div><div class="dgrid">${L.map(d=>`<div class="dcard">
+<div class="cov">${d.cover?`<img src="${esc(d.cover)}" alt="">`:phHTML(d.album)}<button class="play dp" data-u="${esc(d.prev||'')}" data-a="${esc(d.name)}" data-t="${esc(d.track)}" onclick="playPrev(this)">${I.play}</button><span class="ds">${spBtn(d.name,d.album)}</span></div>
+<div class="dt">${esc(d.album)}</div><button class="da" onclick='openArtist(${esc(JSON.stringify(d.name))})'>${esc(d.name)}</button><div class="dv">come ${esc(d.via[0]||'')}</div></div>`).join('')}</div>`}
 function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
 const real=disc.filter(r=>r.d);const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
 const fut=pick(r=>r.d>t).reverse()[0];const alb=pick(r=>r.d<=t&&typeOf(r)==='Album')[0];const sng=pick(r=>r.d<=t&&(typeOf(r)==='Singolo'||typeOf(r)==='EP'))[0];
