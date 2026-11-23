@@ -248,6 +248,10 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 .wposter.big{grid-column:span 2;aspect-ratio:2/1}
 .wposter.big .lab div:nth-child(2){font-size:34px!important}
 @media(min-width:700px){.wposter.big{grid-row:span 2;aspect-ratio:1}.wposter.big .lab div:nth-child(2){font-size:46px!important}}
+/* da scoprire */
+.dgrid{display:grid;grid-template-columns:1fr;gap:12px}
+.card.disc{display:flex;gap:14px;align-items:center;padding:12px}
+@media(min-width:800px){.dgrid{grid-template-columns:repeat(3,1fr)}.card.disc{flex-direction:column;align-items:flex-start}.card.disc .cov{width:100%!important}}
 /* in breve */
 .btab{display:grid;grid-template-columns:auto 1fr;gap:0 16px;margin-top:10px}
 .btab .bk,.btab .bv{padding:9px 0;border-top:1px solid var(--line);font-size:14px}
@@ -288,7 +292,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.40';
+const VER='1.41';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -505,6 +509,7 @@ html+=`<div class="sec" style="margin-top:8px"><h2>Il disco del giorno</h2><span
 setTimeout(()=>albumStory(did).then(t=>{const e=$('#dstory');if(e)e.textContent=t||(dv.d&&+dv.d.slice(0,4)<new Date().getFullYear()?`Uscito ${new Date().getFullYear()-+dv.d.slice(0,4)} anni fa. Rimettilo nel lettore!`:'')}),0);
 const rl=cdl.slice().sort((a,b)=>(a[1].lo||0)-(b[1].lo||0)).slice(0,Math.min(12,cdl.length));const [rid,rv]=rl[dayHash(weekKey())%rl.length];
 if(rid!==did)html+=`<a class="li" href="#album/${rid}" style="margin-top:10px;border:0;background:var(--card);border-radius:14px;padding:10px 12px"><div class="th">${coverImg(rid,rv.a,rv.t)}</div><div class="tx"><span style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Da riascoltare questa settimana</span><b>${esc(rv.t)}</b><span>${esc(rv.a)}${rv.lo?' · non lo apri da '+Math.round((Date.now()-rv.lo)/DAY)+' giorni':''}</span></div></a>`;html+='</div>'}
+html+=`<div id="disco3"></div>`;
 const pr=Object.values(S.artists).filter(a=>a.prio);const html0=html;html='';
 if(pr.length){const pn=news.filter(x=>isPrio(x.aid)).sort((a,b)=>b.d.localeCompare(a.d));
 html+=`<div class="sec"><h2>★ Le tue priorità</h2><a class="more" href="#artisti">Modifica</a></div><div class="hscroll" style="margin-bottom:4px">${pr.map(a=>`<a class="av" style="width:64px" href="#artista/${a.mbid}">${avatar(a.name,'pic prio" style="width:64px;height:64px')}<div class="n" style="font-size:11.5px">${esc(a.name)}</div></a>`).join('')}</div>`+
@@ -521,7 +526,7 @@ if(otd.length)html+=`<div class="sec"><h2>Accadde oggi</h2></div>${otd.map(x=>`<
 html+=prioHtml;
 html+=`<div class="sec"><h2>I tuoi artisti</h2><a class="more" href="#artisti">Tutti</a></div><div class="hscroll">${Object.values(S.artists).sort((a,b)=>(b.addedAt||0)-(a.addedAt||0)).slice(0,20).map(a=>`<a class="av" href="#artista/${a.mbid}">${avatar(a.name)}<div class="n">${esc(a.name)}</div></a>`).join('')}</div>`;
 if(S.settings.tm)html+=`<div class="sec"><h2>Concerti in Italia</h2><a class="more" href="#concerti">Tutti</a></div><div id="hc">${loading}</div>`;
-$('#hn').innerHTML=html;
+$('#hn').innerHTML=html;discoveries().then(L=>{const e=$('#disco3');if(e&&L.length)e.innerHTML=discoHTML(L)}).catch(()=>{});
 if(S.settings.tm){const allc=await allConcerts();if(!ok())return;const pnames=new Set(Object.values(S.artists).filter(a=>a.prio).map(a=>a.name));const pc=allc.filter(c=>c.cc==='IT'&&c.date>=today()&&pnames.has(c.artist));const ep=$('#hpc');if(ep)ep.innerHTML=pc.length?pc.slice(0,6).map(concertRow).join(''):'<div class="card muted small">Nessun concerto in Italia annunciato per ora.</div>';
 const cs=allc.filter(c=>c.cc==='IT'&&c.date>=today()).slice(0,4);const e=$('#hc');if(e)e.innerHTML=cs.length?cs.map(concertRow).join(''):'<div class="card muted small">Nessun concerto in Italia annunciato per ora.</div>'}}
 window.markAll=()=>{for(const k in S.seen)if(S.seen[k]==='new')S.seen[k]='old';save();render()};
@@ -586,6 +591,24 @@ const last=out[out.length-1];if(last&&last.names.join()===nm.join()){last.to=ny;
 return out.length>1?out.slice(-8):[]}
 function dzReleases(name){return cached('dzrel:'+name,2*DAY,async()=>{const id=await dzArtistId(name);if(!id)return[];const d=await dz(`artist/${id}/albums?limit=100`);
 return((d&&d.data)||[]).map(x=>({t:x.title,d:x.release_date||'',k:x.record_type,img:x.cover_medium||'',dz:x.id}))}).catch(()=>[])}
+/* ---------- Da scoprire: dischi nuovi in base ai tuoi gusti ---------- */
+async function discoveries(){const key='ol-disc-'+today();try{const c=JSON.parse(localStorage.getItem(key)||'null');if(c)return c}catch(e){}
+const mine=new Set(Object.values(S.artists).map(a=>norm(a.name)));const cdCount={};Object.values(S.albums).filter(v=>v.cd).forEach(v=>cdCount[v.a]=(cdCount[v.a]||0)+1);
+const seeds=Object.values(S.artists).map(a=>({n:a.name,w:(a.prio?3:1)+(cdCount[a.name]||0)})).sort((x,y)=>y.w-x.w).slice(0,24);
+const rot=dayHash(today())%Math.max(1,seeds.length);const pickSeeds=[...seeds.slice(0,6),...seeds.slice(6).filter((_,i)=>(i+rot)%3===0)].slice(0,12);
+const cand={};for(const sd of pickSeeds){const L=await similarArtists(sd.n);L.forEach((x,i)=>{if(mine.has(norm(x.name)))return;const c=cand[x.name]||(cand[x.name]={name:x.name,img:x.img,score:0,via:[]});c.score+=sd.w*(1-i/20);if(c.via.length<2&&!c.via.includes(sd.n))c.via.push(sd.n)})}
+const shown=JSON.parse(localStorage.getItem('ol-disc-shown')||'[]');let C=Object.values(cand).filter(c=>!shown.includes(c.name)).sort((x,y)=>y.score-x.score).slice(0,15);
+if(!C.length)C=Object.values(cand).sort((x,y)=>y.score-x.score).slice(0,15);const out=[];const h=dayHash(today());
+for(let i=0;i<C.length&&out.length<3;i++){const c=C[(i*7+h)%C.length];if(out.some(o=>o.name===c.name))continue;const tt=await topTracks(c.name);if(!tt.length)continue;
+const cnt={};tt.forEach(t=>{if(t.album)cnt[t.album]=(cnt[t.album]||0)+1});const alb=Object.entries(cnt).sort((x,y)=>y[1]-x[1])[0];const t0=tt.find(t=>t.album===alb[0])||tt[0];
+out.push({name:c.name,img:c.img,via:c.via,album:alb[0],cover:t0.cover,track:t0.t,prev:t0.prev})}
+if(out.length){try{localStorage.setItem(key,JSON.stringify(out));localStorage.setItem('ol-disc-shown',JSON.stringify([...shown,...out.map(o=>o.name)].slice(-60)));for(let k=0;k<localStorage.length;k++){const kk=localStorage.key(k);if(kk&&kk.startsWith('ol-disc-2')&&kk!==key)localStorage.removeItem(kk)}}catch(e){}}
+return out}
+function discoHTML(L){return `<div class="sec"><h2>Da scoprire oggi</h2><span class="small muted">in base a quello che ascolti</span></div><div class="dgrid">${L.map(d=>`<div class="card disc">
+<div class="cov" style="width:96px;flex:none">${d.cover?`<img src="${esc(d.cover)}" alt="">`:phHTML(d.album)}</div>
+<div style="flex:1;min-width:0"><div style="font-family:var(--serif);font-size:18px;line-height:1.2">${esc(d.album)}</div><button class="small" style="color:var(--gold);font-weight:600;margin-top:3px;text-align:left" onclick='openArtist(${esc(JSON.stringify(d.name))})'>${esc(d.name)} →</button>
+<div class="small muted" style="margin-top:5px;line-height:1.35">Perché ascolti ${d.via.map(esc).join(' e ')}</div>
+<div class="row" style="gap:8px;margin-top:9px"><button class="play" data-u="${esc(d.prev||'')}" data-a="${esc(d.name)}" data-t="${esc(d.track)}" onclick="playPrev(this)">${I.play}</button>${spBtn(d.name,d.album)}<span class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.track)}</span></div></div></div>`).join('')}</div>`}
 function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
 const real=disc.filter(r=>r.d);const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
 const fut=pick(r=>r.d>t).reverse()[0];const alb=pick(r=>r.d<=t&&typeOf(r)==='Album')[0];const sng=pick(r=>r.d<=t&&(typeOf(r)==='Singolo'||typeOf(r)==='EP'))[0];
