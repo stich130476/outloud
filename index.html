@@ -297,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.47';
+const VER='1.48';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -638,18 +638,24 @@ function discoHTML(L){return `<div class="sec"><h2>Da scoprire oggi</h2><span cl
 const NOTSTUDIO=/\b(live|en vivo|dal vivo|in concert|unplugged|session|sessions|recordings|remaster(ed)?|deluxe|edition|anniversary|expanded|reissue|collection|best of|greatest|hits|anthology|essentials|b-sides|rarities|demos?|instrumentals?|karaoke|remix(es)?|mix|edit|version|acoustic|tribute|soundtrack|ost|commentary|bonus|box set)\b/i;
 function itAlbums(name){return cached('ital:'+name,2*DAY,async()=>{const r=await jsonp(`https://itunes.apple.com/search?term=${enc(name)}&entity=album&attribute=artistTerm&limit=100&country=it`);
 return((r&&r.results)||[]).filter(x=>norm(x.artistName)===norm(name)).map(x=>{const raw=x.collectionName||'';const k=/ - Single$/i.test(raw)?'single':/ - EP$/i.test(raw)?'ep':'album';return{t:raw.replace(/ - (Single|EP)$/i,''),d:(x.releaseDate||'').slice(0,10),k,tracks:x.trackCount||0}})}).catch(()=>[])}
-async function releaseCheck(name,disc,mb){const [D,A]=await Promise.all([dzReleases(name),itAlbums(name)]);const t=today();
+function spReleases(name){return cached('spal:'+name,2*DAY,async()=>{const tok=await spToken();if(!tok)throw 0;const H={Authorization:'Bearer '+tok};
+let id=Object.values(S.artists).find(a=>norm(a.name)===norm(name))?.spotifyId;if(!id){const r=await fetch(`https://api.spotify.com/v1/search?type=artist&limit=5&q=${enc(name)}`,{headers:H});if(!r.ok)throw 0;const j=await r.json();id=(j.artists?.items||[]).find(a=>norm(a.name)===norm(name))?.id;if(!id)return[]}
+const out=[];let u=`https://api.spotify.com/v1/artists/${id}/albums?include_groups=album,single,compilation&market=IT&limit=50`;let n=0;
+while(u&&n<4){const r=await fetch(u,{headers:H});if(!r.ok)break;const j=await r.json();(j.items||[]).forEach(x=>out.push({t:x.name,d:(x.release_date||'').length===4?x.release_date+'-01-01':x.release_date||'',k:x.album_type==='compilation'?'album':x.album_type==='single'?(x.total_tracks>3?'ep':'single'):'album',src:'sp'}));u=j.next;n++}
+return out}).catch(()=>[])}
+async function releaseCheck(name,disc,mb){const [D,A,P]=await Promise.all([dzReleases(name),itAlbums(name),spReleases(name)]);const t=today();
 const mbAny={};disc.forEach(r=>{const k=norm(baseTitle(r.t));if(!mbAny[k]||r.d<mbAny[k].d)mbAny[k]=r});
 const ok=x=>x.d&&!NOTSTUDIO.test(x.t)&&!/\(|\[/.test(x.t.replace(/\((feat|ft|with)\.?[^)]*\)/i,''));
 const known=x=>{const m=mbAny[norm(baseTitle(x.t))];return m?(typeOf(m)!=='Album'&&typeOf(m)!=='Singolo'&&typeOf(m)!=='EP')||m.d.slice(0,4)<x.d.slice(0,4):false};
 const both=(x,L)=>L.some(y=>norm(baseTitle(y.t))===norm(baseTitle(x.t))&&Math.abs(new Date(y.d)-new Date(x.d))<45*DAY);
-const pool=(kinds)=>{const dz=D.filter(x=>kinds.includes(x.k)).map(x=>({...x,src:'dz'}));const am=A.filter(x=>kinds.includes(x.k)).map(x=>({...x,src:'am'}));
-return [...dz,...am].filter(x=>ok(x)&&!known(x)&&both(x,x.src==='dz'?am:dz))};
+const srcs=k=>({dz:D.filter(x=>k(x)).map(x=>({...x,src:'dz'})),am:A.filter(x=>k(x)).map(x=>({...x,src:'am'})),sp:P.filter(x=>k(x)).map(x=>({...x,src:'sp'}))});
+const agreed=(S3,extra)=>{const all=[...S3.dz,...S3.am,...S3.sp];return all.filter(x=>extra(x)&&['dz','am','sp'].filter(s=>s!==x.src&&both(x,S3[s])).length>=1)};
+const pool=(kinds)=>agreed(srcs(x=>kinds.includes(x.k)),x=>ok(x)&&!known(x));
 const pick=(L,fut)=>L.filter(x=>fut?x.d>t:x.d<=t).sort((x,y)=>fut?x.d.localeCompare(y.d):y.d.localeCompare(x.d))[0];
 const newer=(x,cur)=>x&&(!cur||!cur.d||x.d.slice(0,10)>cur.d.slice(0,10))?x:null;
 const albP=pool(['album']),sngP=pool(['single','ep']);
 const RAC=/\b(best of|greatest|hits|collection|anthology|essentials|b-sides|rarities|the very best|singles)\b/i,LIV=/\b(live|unplugged|in concert|dal vivo|en vivo)\b/i;
-const pool2=(re)=>{const dz=D.filter(x=>x.k==='album'&&re.test(x.t)).map(x=>({...x,src:'dz'}));const am=A.filter(x=>x.k==='album'&&re.test(x.t)).map(x=>({...x,src:'am'}));return [...dz,...am].filter(x=>x.d&&both(x,x.src==='dz'?am:dz))};
+const pool2=(re)=>agreed(srcs(x=>x.k==='album'&&re.test(x.t)),x=>!!x.d);
 const out={alb:newer(pick(albP,0),mb.alb),sng:newer(pick(sngP,0),mb.sng),rac:newer(pick(pool2(RAC),0),mb.rac),liv:newer(pick(pool2(LIV),0),mb.liv)};const f=pick([...albP,...sngP],1);out.fut=f&&(!mb.fut||f.d<mb.fut.d)?f:null;
 const dzm=x=>x&&(D.find(y=>norm(baseTitle(y.t))===norm(baseTitle(x.t)))||{}).dz;['alb','sng','fut','rac','liv'].forEach(k=>{if(out[k]&&!out[k].dz)out[k].dz=dzm(out[k])});return out}
 function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
@@ -674,7 +680,7 @@ cur.length&&lineups(members,by,ey).length<2?['Formazione',esc(cur.join(', '))]:n
 ['Notizie e rumors',`<a target="_blank" style="color:var(--gold)" href="https://news.google.com/search?q=${enc('"'+a.name+'"')}&hl=it&gl=IT&ceid=IT:it">Le ultime notizie →</a>`]].filter(Boolean);
 B.innerHTML=`<div class="card brief" style="margin-top:18px"><div style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase">In breve</div>
 <p id="bbio" class="bio" style="margin:8px 0 4px;font-size:15px;line-height:1.55;font-family:var(--serif)"></p>
-<div class="btab">${rows.map(([k,v])=>`<div class="bk${k?'':' cont'}">${k}</div><div class="bv${k?'':' cont'}">${v}</div>`).join('')}</div><div class="small muted" style="padding-top:10px;font-size:11px;text-align:right">Dati verificati incrociando MusicBrainz, Deezer e Apple Music</div></div>`;
+<div class="btab">${rows.map(([k,v])=>`<div class="bk${k?'':' cont'}">${k}</div><div class="bv${k?'':' cont'}">${v}</div>`).join('')}</div><div class="small muted" style="padding-top:10px;font-size:11px;text-align:right">Dati verificati incrociando MusicBrainz, ${K.spRef?'Spotify, ':''}Deezer e Apple Music</div></div>`;
 const fill=r=>{if(!$('#brief'))return;r=r||{};
 const cell=(lab,x,empty,badge)=>{const k=[...document.querySelectorAll('#brief .bk')].find(e=>e.textContent===lab);if(!k)return;const v=k.nextElementSibling;
 if(!x){v.innerHTML=`<span class="muted">${empty}</span>`;return}const m=disc.find(q=>q.id===x.id)||disc.find(q=>norm(q.t)===norm(x.t));const href=m?`#album/${m.id}`:(x.dz?`https://www.deezer.com/album/${x.dz}`:'');
