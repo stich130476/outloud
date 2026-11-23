@@ -280,7 +280,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.35';
+const VER='1.36';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -356,10 +356,13 @@ function hue(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;re
 function phHTML(title,sub){const h=hue(title);const ini=String(title||'?').replace(/[^\p{L}\p{N} ]/gu,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'♪';
 return `<div class="ph" style="background:linear-gradient(135deg,hsl(${h},35%,28%),hsl(${(h+50)%360},40%,14%))"><div>${esc(ini)}${sub?`<small>${esc(sub)}</small>`:''}</div></div>`}
 function caa(id,sz=250){return `https://coverartarchive.org/release-group/${id}/front-${sz}`}
-function coverImg(id,artist,title,sz=250){return `<img loading="lazy" src="${caa(id,sz)}" data-a="${esc(artist)}" data-t="${esc(title)}" onerror="coverFail(this)" onload="wallAdd(this)" alt="">`}
+let covMap;try{covMap=JSON.parse(localStorage.getItem('ol-cov')||'{}')}catch(e){covMap={}}
+function saveCov(){try{localStorage.setItem('ol-cov',JSON.stringify(covMap))}catch(e){}}
+function coverImg(id,artist,title,sz=250){const alt=covMap[id];if(alt==='-')return phHTML(title,artist);return `<img loading="lazy" src="${alt||caa(id,sz)}" data-id="${id}" data-a="${esc(artist)}" data-t="${esc(title)}" onerror="coverFail(this)" onload="wallAdd(this)" alt="">`}
 let wallT,wallL;try{wallL=JSON.parse(localStorage.getItem('ol-wall')||'[]')}catch(e){wallL=[]}
 window.wallAdd=function(el){const u=el.currentSrc||el.src;if(!u||u.startsWith('data:')||wallL.includes(u))return;wallL.unshift(u);if(wallL.length>140)wallL.length=140;clearTimeout(wallT);wallT=setTimeout(()=>{try{localStorage.setItem('ol-wall',JSON.stringify(wallL))}catch(e){}},1500)};
-window.coverFail=async function(el){if(el.dataset.tried){el.outerHTML=phHTML(el.dataset.t,el.dataset.a);return}el.dataset.tried=1;const u=await dzCover(el.dataset.a,el.dataset.t);if(u)el.src=u;else el.outerHTML=phHTML(el.dataset.t,el.dataset.a)};
+window.coverFail=async function(el){const id=el.dataset.id;if(el.dataset.tried){if(id){covMap[id]='-';saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a);return}el.dataset.tried=1;if(id&&covMap[id]){delete covMap[id];saveCov()}
+const u=await dzCover(el.dataset.a,el.dataset.t);if(u){el.src=u;if(id){covMap[id]=u;saveCov()}}else{if(id){covMap[id]='-';saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a)}};
 function avatar(name,cls='pic'){const id='p'+Math.random().toString(36).slice(2);artistPhoto(name).then(u=>{const e=document.getElementById(id);if(e)e.innerHTML=u?`<img src="${u}" alt="" loading="lazy" onload="wallAdd(this)">`:phHTML(name)});return `<div class="${cls}" id="${id}">${phHTML(name)}</div>`}
 
 /* ---------- date ---------- */
