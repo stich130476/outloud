@@ -87,7 +87,7 @@ body.day .hero:after{background:linear-gradient(180deg,rgba(245,240,230,.05),rgb
 .hero>*:not(.bgi){position:relative;z-index:1}
 .hero h1{font-size:38px;line-height:1.05}
 .back{position:fixed;top:calc(env(safe-area-inset-top) + 12px);left:14px;z-index:30;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.star{position:absolute;right:18px;bottom:24px;z-index:2}
+.hero .star{position:absolute;right:18px;bottom:24px;z-index:2}
 .tabs{display:flex;gap:6px;overflow-x:auto;margin:16px 0 4px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tab{padding:8px 15px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--mu);background:var(--card);border:1px solid var(--line);white-space:nowrap}
@@ -288,7 +288,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.38';
+const VER='1.39';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -584,6 +584,8 @@ if(!seg.length)return[];const yrs=[...new Set(seg.flatMap(x=>[x.s,x.e+1]))].filt
 for(let i=0;i<yrs.length;i++){const y=yrs[i],ny=(yrs[i+1]||end+1)-1;if(y>ny)continue;const nm=[...new Set(seg.filter(x=>x.s<=y&&x.e>=y).map(x=>x.full))];if(!nm.length)continue;
 const last=out[out.length-1];if(last&&last.names.join()===nm.join()){last.to=ny;continue}out.push({from:y,to:ny,names:nm})}
 return out.length>1?out.slice(-8):[]}
+function dzReleases(name){return cached('dzrel:'+name,2*DAY,async()=>{const id=await dzArtistId(name);if(!id)return[];const d=await dz(`artist/${id}/albums?limit=100`);
+return((d&&d.data)||[]).map(x=>({t:x.title,d:x.release_date||'',k:x.record_type,img:x.cover_medium||'',dz:x.id}))}).catch(()=>[])}
 function briefHTML(a,disc,members,by,ey,qid,mbid){const B=$('#brief');if(!B)return;const t=today();
 const real=disc.filter(r=>r.d);const pick=f=>real.filter(f).sort((x,y)=>y.d.localeCompare(x.d));
 const fut=pick(r=>r.d>t).reverse()[0];const alb=pick(r=>r.d<=t&&typeOf(r)==='Album')[0];const sng=pick(r=>r.d<=t&&(typeOf(r)==='Singolo'||typeOf(r)==='EP'))[0];
@@ -603,6 +605,13 @@ cur.length&&lineups(members,by,ey).length<2?['Formazione',esc(cur.join(', '))]:n
 B.innerHTML=`<div class="card brief" style="margin-top:18px"><div style="color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase">In breve</div>
 <p id="bbio" class="bio" style="margin:8px 0 4px;font-size:15px;line-height:1.55;font-family:var(--serif)"></p>
 <div class="btab">${rows.map(([k,v])=>`<div class="bk${k?'':' cont'}">${k}</div><div class="bv${k?'':' cont'}">${v}</div>`).join('')}</div></div>`;
+dzReleases(a.name).then(R=>{if(!R.length||!$('#brief'))return;const t2=today();
+const best=(k,fut)=>R.filter(x=>x.d&&(k.includes(x.k))&&(fut?x.d>t2:x.d<=t2)).sort((x,y)=>fut?x.d.localeCompare(y.d):y.d.localeCompare(x.d))[0];
+const mb=k=>disc.find(r=>norm(r.t)===norm(k.t));
+const cell=(lab,x,cur)=>{if(!x)return;if(cur&&cur.d&&cur.d>=x.d)return;const r=mb(x);const html=r?`<a href="#album/${r.id}" style="color:var(--tx)"><b style="font-weight:600">${esc(x.t)}</b> <span class="muted">· ${fmtDate(x.d)}</span></a>`:`<a target="_blank" href="https://www.deezer.com/album/${x.dz}" style="color:var(--tx)"><b style="font-weight:600">${esc(x.t)}</b> <span class="muted">· ${fmtDate(x.d)}</span></a>`;
+const k=[...document.querySelectorAll('#brief .bk')].find(e=>e.textContent===lab);if(k)k.nextElementSibling.innerHTML=html+(lab==='Prossima uscita'?' '+whenBadge(x.d):'')};
+cell('Ultimo album',best(['album'],0),alb);cell('Ultimo singolo',best(['single','ep'],0),sng);
+const f=best(['album','single','ep'],1);if(f&&(!fut||f.d<fut.d))cell('Prossima uscita',f,null)});
 if(qid)wikiInfo(qid).then(w=>{const e=$('#bbio');if(!e)return;const txt=(w.text||'').replace(/\s*\([^)]*\)/g,'').replace(/\s+/g,' ').trim();const sents=txt.match(/[^.!?]+[.!?]+/g)||[];e.textContent=sents.slice(0,2).join(' ').trim();if(!e.textContent)e.remove()}).catch(()=>{});else{const e=$('#bbio');e&&e.remove()}
 if(S.settings.tm)concertsFor(a.name).then(cs=>{const e=$('#bgig');if(!e)return;const it=cs.filter(c=>c.cc==='IT'&&c.date>=t);const all=cs.filter(c=>c.date>=t);
 e.className='';e.innerHTML=it.length?`<b style="font-weight:600">${esc(it[0].city)}</b> <span class="muted">· ${fmtDate(it[0].date)}${it.length>1?` · e altre ${it.length-1} date in Italia`:''}</span>`:all.length?`<span class="muted">Nessuna data in Italia · ${all.length} all'estero</span>`:'<span class="muted">Nessun concerto annunciato</span>'})}
