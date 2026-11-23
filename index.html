@@ -248,6 +248,10 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 .wposter.big{grid-column:span 2;aspect-ratio:2/1}
 .wposter.big .lab div:nth-child(2){font-size:34px!important}
 @media(min-width:700px){.wposter.big{grid-row:span 2;aspect-ratio:1}.wposter.big .lab div:nth-child(2){font-size:46px!important}}
+/* priorità in colonne */
+.pgrid{display:grid;grid-template-columns:1fr;gap:0 22px}
+.pcol{min-width:0}
+@media(min-width:700px){.pgrid{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}.pcol .hscroll{margin:0;padding-left:0;padding-right:0}.pcol .news{width:150px}}
 /* ---------- iPad e schermi larghi ---------- */
 @media(min-width:800px){
 #app{max-width:1180px;padding-left:36px;padding-right:36px}
@@ -276,7 +280,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.33';
+const VER='1.34';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -494,8 +498,9 @@ const pr=Object.values(S.artists).filter(a=>a.prio);const html0=html;html='';
 if(pr.length){const pn=news.filter(x=>isPrio(x.aid)).sort((a,b)=>b.d.localeCompare(a.d));
 html+=`<div class="sec"><h2>★ Le tue priorità</h2><a class="more" href="#artisti">Modifica</a></div><div class="hscroll" style="margin-bottom:4px">${pr.map(a=>`<a class="av" style="width:64px" href="#artista/${a.mbid}">${avatar(a.name,'pic prio" style="width:64px;height:64px')}<div class="n" style="font-size:11.5px">${esc(a.name)}</div></a>`).join('')}</div>`+
 (()=>{const grp=[['Nuovi dischi',x=>['Album','EP'].includes(typeOf(x))],['Singoli',x=>typeOf(x)==='Singolo'],['Raccolte e live',x=>['Raccolta','Live'].includes(typeOf(x))]];let h='';
-grp.forEach(([t,f])=>{const L=pn.filter(f).sort((a,b)=>b.d.localeCompare(a.d));if(L.length)h+=`<div class="dec" style="margin:18px 0 10px">${t}</div><div class="hscroll">${L.map(card).join('')}</div>`});
-if(S.settings.tm)h+=`<div class="dec" style="margin:18px 0 6px">Concerti in Italia</div><div id="hpc">${loading}</div>`;
+grp.forEach(([t,f])=>{const L=pn.filter(f).sort((a,b)=>b.d.localeCompare(a.d));if(L.length)h+=`<div class="pcol"><div class="dec" style="margin:18px 0 10px">${t} <span class="small muted" style="font-family:var(--sans)">${L.length}</span></div><div class="hscroll">${L.map(card).join('')}</div></div>`});
+if(S.settings.tm)h+=`<div class="pcol"><div class="dec" style="margin:18px 0 6px">Concerti in Italia</div><div id="hpc">${loading}</div></div>`;
+if(h)h=`<div class="pgrid">${h}</div>`;
 return h||`<div class="card muted small" style="margin-top:10px">Nessuna uscita recente dai tuoi gruppi prioritari: ti avviso io appena c'è qualcosa.</div>`})()}
 const prioHtml=html;html=html0;
 if(fut.length)html+=`<div class="sec"><h2>In arrivo</h2></div><div class="hscroll">${fut.map(card).join('')}</div>`;
