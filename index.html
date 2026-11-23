@@ -297,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.52';
+const VER='1.53';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -934,7 +934,7 @@ if(!id&&w.plName){const tok=await spToken();if(tok){try{let u='https://api.spoti
 if(id){w.plId=id;save()}}catch(e){}}}
 if(id)location.href=`https://open.spotify.com/playlist/${id}`;else{toast(K.spRef?'Playlist non trovata: la cerco su Spotify':'Collega Spotify per aprirla direttamente');setTimeout(()=>location.href=`https://open.spotify.com/search/${enc(w.plName||('Wrapped '+y))}/playlists`,900)}};
 function allWrapped(){const W=Object.entries(S.wrapped||{});const M={};
-W.forEach(([y,w])=>(w.pl||w.tr||[]).forEach((t,i)=>{const k=norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]);if(!k||k==='|')return;const o=M[k]||(M[k]={t:t.t,a:t.a,img:t.img||'',u:t.u||'',ry:t.ry||'',years:[],best:999});if(!o.ry&&t.ry)o.ry=t.ry;o.years.push(y);o.best=Math.min(o.best,i);if(!o.u&&t.u)o.u=t.u;if(!o.img&&t.img)o.img=t.img}));
+W.forEach(([y,w])=>(w.pl||w.tr||[]).forEach((t,i)=>{const k=norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]);if(!k||k==='|')return;const o=M[k]||(M[k]={t:t.t,a:t.a,img:t.img||'',u:t.u||'',ry:t.ry||'',years:[],best:999});if(!o.ry&&t.ry)o.ry=t.ry;if(!o.years.includes(y))o.years.push(y);o.best=Math.min(o.best,i);if(!o.u&&t.u)o.u=t.u;if(!o.img&&t.img)o.img=t.img}));
 return Object.values(M).sort((a,b)=>b.years.length-a.years.length||a.best-b.best)}
 window.vAllWrapped=function(){const L=allWrapped();const sh=sheet(`<div style="color:var(--gold);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11px">Tutti i miei Wrapped</div><h1 style="font-size:34px;margin:4px 0 6px">${L.length} brani</h1>
 <p class="small muted" style="line-height:1.5;margin:0 0 12px">Tutti i brani di tutte le tue playlist Wrapped, una volta sola. In cima quelli presenti in più anni.</p>
@@ -973,7 +973,8 @@ const bin=atob(j.content.replace(/\n/g,''));const txt=new TextDecoder().decode(U
 async function ghPut(sha){const bytes=new TextEncoder().encode(JSON.stringify(S));let bin='';for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
 const r=await fetch(ghU(),{method:'PUT',headers:ghH(),body:JSON.stringify({message:'OutLoud! sync',content:btoa(bin),...(sha?{sha}:{})})});if(!r.ok)throw new Error('GitHub '+r.status)}
 let syncing=false;
-function fixWrapped(){const w=S.wrapped||{};if(w['2026']&&w['2026'].plName&&!/(19|20)\d\d/.test(w['2026'].plName)&&!w['2026'].min){w.sempre=w['2026'];delete w['2026'];save()}}
+function fixWrapped(){const w=S.wrapped||{};
+if(w['2026']&&w.sempre&&!w['2026'].min){const k=x=>new Set((x.pl||[]).map(t=>norm(t.t)+norm(t.a)));const a=k(w['2026']),b=k(w.sempre);let c=0;a.forEach(x=>b.has(x)&&c++);if(a.size&&c/a.size>0.7){delete w['2026'];save();return}}if(w['2026']&&w['2026'].plName&&!/(19|20)\d\d/.test(w['2026'].plName)&&!w['2026'].min){w.sempre=w['2026'];delete w['2026'];save()}}
 function mergeState(L,R){if(!R)return L;const out=Object.assign(blank(),R,L);const del=Object.assign({},R.del||{},L.del||{});
 for(const k in del){const o=(L.del||{})[k]||0,r=(R.del||{})[k]||0;del[k]=Math.max(o,r)}
 const mm=(a,b,pre)=>{const o={};for(const k of new Set([...Object.keys(a||{}),...Object.keys(b||{})])){const x=(a||{})[k],y=(b||{})[k];const w=!x?y:!y?x:((x.u||0)>=(y.u||0)?x:y);if(del[pre+k]&&del[pre+k]>(w.u||w.addedAt||0))continue;o[k]=w}return o};
