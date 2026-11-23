@@ -297,7 +297,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.54';
+const VER='1.55';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -957,10 +957,14 @@ let r=await fetch('https://api.spotify.com/v1/me/playlists',{method:'POST',heade
 if(!r.ok){let m='';try{m=(await r.json()).error?.message||''}catch(e){}throw new Error('Spotify '+r.status+(m?': '+m:'')+' (creazione)')}id=(await r.json()).id;S.settings.allPl=id;save()}
 const have=new Set();for(const ep of['items','tracks']){let u=`https://api.spotify.com/v1/playlists/${id}/${ep}?limit=100`;let n=0,okk=false;while(u&&n<30){const r=await fetch(u,{headers:H});if(!r.ok)break;okk=true;const j=await r.json();(j.items||[]).forEach(x=>{const t=x.item||x.track;t&&t.uri&&have.add(t.uri)});u=j.next;n++}if(okk)break}
 const uris=[];let i=0;for(const t of L){i++;if(i%10===0)say(`Cerco i brani su Spotify… ${i}/${L.length}`);let uri=t.u;
-if(!uri){try{const r=await fetch(`https://api.spotify.com/v1/search?type=track&limit=3&market=IT&q=${enc('track:"'+baseTitle(t.t)+'" artist:"'+(t.a||'').split(', ')[0]+'"')}`,{headers:H});if(r.ok){const j=await r.json();uri=j.tracks?.items?.[0]?.uri||''}}catch(e){}}
+if(!uri){const ar=(t.a||'').split(', ')[0];for(const q of ['track:"'+baseTitle(t.t)+'" artist:"'+ar+'"',ar+' '+baseTitle(t.t)]){if(uri)break;
+for(let tr=0;tr<4;tr++){try{const r=await fetch(`https://api.spotify.com/v1/search?type=track&limit=5&market=IT&q=${enc(q)}`,{headers:H});
+if(r.status===429){const w=(+r.headers.get('Retry-After')||2)*1000+300;say(`Spotify chiede una pausa… riprendo tra ${Math.round(w/1000)}s`);await sleep(w);continue}
+if(r.ok){const j=await r.json();const it=j.tracks?.items||[];const m=it.find(x=>(x.artists||[]).some(a=>norm(a.name)===norm(ar))&&norm(baseTitle(x.name))===norm(baseTitle(t.t)))||it.find(x=>(x.artists||[]).some(a=>norm(a.name)===norm(ar)));uri=m?.uri||''}break}catch(e){break}}}
+await sleep(120);if(uri)t.u=uri}
 if(uri&&!have.has(uri)&&!uris.includes(uri))uris.push(uri)}
 for(let k=0;k<uris.length;k+=100){say(`Aggiungo i brani… ${Math.min(k+100,uris.length)}/${uris.length}`);const body=JSON.stringify({uris:uris.slice(k,k+100)});let r=await fetch(`https://api.spotify.com/v1/playlists/${id}/items`,{method:'POST',headers:H,body});if(!r.ok)r=await fetch(`https://api.spotify.com/v1/playlists/${id}/tracks`,{method:'POST',headers:H,body});if(!r.ok){let m='';try{m=(await r.json()).error?.message||''}catch(e){}throw new Error('Spotify '+r.status+(m?': '+m:''))}}
-say(uris.length?`Fatto: ${uris.length} brani aggiunti.`:'La playlist è già aggiornata.');toast('Playlist pronta su Spotify 🎧')}catch(e){say('Spotify non ha permesso di creare o modificare la playlist ('+e.message+'). Usa "Copia l\'elenco".')}}
+const miss=L.filter(t=>!t.u).length;say((uris.length?`Fatto: ${uris.length} brani aggiunti.`:'La playlist è già aggiornata.')+(miss?` ${miss} brani non trovati su Spotify.`:''));toast('Playlist pronta su Spotify 🎧')}catch(e){say('Spotify non ha permesso di creare o modificare la playlist ('+e.message+'). Usa "Copia l\'elenco".')}}
 window.vWrapped=vWrapped;
 async function spToMb(c){try{const j=await mb(`url?resource=${enc('https://open.spotify.com/artist/'+c.id)}&inc=artist-rels`);const r=(j.relations||[]).find(x=>x.artist);if(r)return{id:r.artist.id,name:r.artist.name}}catch(e){}
 try{const j=await mb(`artist?query=${enc('artist:"'+c.name+'"')}&limit=5`);const a=(j.artists||[]).find(x=>norm(x.name)===norm(c.name)&&x.score>=90);if(a)return{id:a.id,name:a.name}}catch(e){}return null}
