@@ -229,7 +229,14 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 #intro .ienter{margin-top:34px;padding:15px 50px;border-radius:99px;font:700 17px var(--sans);color:#1a130a;background:linear-gradient(120deg,#fff1c9,#e2bb6a 55%,#b38a3e);box-shadow:0 14px 40px rgba(214,179,106,.35);opacity:0;animation:fadeup .9s 1.8s forwards}
 #intro .ienter:active{transform:scale(.96)}
 #intro .istats{margin-top:18px;color:#8f887b;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:0;animation:fadeup .9s 2.1s forwards}
-#intro .ctr{display:flex;flex-direction:column;align-items:center}
+#intro .ctr{display:flex;flex-direction:column;align-items:center;position:absolute;left:0;right:0;bottom:0;padding:0 24px calc(env(safe-area-inset-bottom) + 48px)}
+#intro .wall{top:38%;min-height:150vmax}
+#intro .vig{background:linear-gradient(180deg,rgba(6,6,8,.25) 0%,rgba(6,6,8,.15) 25%,rgba(6,6,8,.75) 50%,#060608 66%)!important}
+body.day #intro .vig{background:linear-gradient(180deg,rgba(243,236,224,.15) 0%,rgba(243,236,224,.1) 25%,rgba(243,236,224,.82) 50%,#f3ece0 66%)!important}
+body.day #intro .lo-out{color:#8a6420}
+body.day #intro p{color:#5f574a!important}
+body.day #intro .istats{color:#7a6f5c!important}
+body.day #intro .lo-loud{text-shadow:none}
 body.day #intro{background:#f3ece0}
 body.day #intro .vig{background:radial-gradient(ellipse at 50% 50%,rgba(243,236,224,.35) 0,rgba(243,236,224,.78) 45%,#f3ece0 88%)}
 body.day #intro p{color:#7a7266}body.day #intro .istats{color:#8a7f6d}
@@ -247,7 +254,7 @@ body.day .wrow img{filter:saturate(.9) brightness(1)}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.30';
+const VER='1.31';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
