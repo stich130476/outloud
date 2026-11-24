@@ -302,7 +302,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.63';
+const VER='1.64';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -473,16 +473,28 @@ if(!id){const r=await fetch(`https://api.spotify.com/v1/search?type=artist&limit
 const r=await fetch(`https://api.spotify.com/v1/artists/${id}/top-tracks?market=IT`,{headers:H});if(!r.ok)return null;const j=await r.json();return j.tracks||null}
 window.spConnect=()=>{sessionStorage.setItem('sp-only',1);spLogin()};
 /* brani migliori: classifica incrociata Deezer (ascolti) + Apple Music (popolarità) */
-function topTracks(name){return cached('top5:'+name+(K.spRef?':sp':'')+(S.settings.lf?':lf':'')+(S.settings.yt?':yt':''),7*DAY,async()=>{const id=await dzArtistId(name);const T={};const add=(t,src,pos,extra)=>{if(!t||isAlt(t))return;const k=norm(baseTitle(t));if(!k)return;
-const o=T[k]||(T[k]={t:baseTitle(t),score:0,src:new Set()});o.score+=Math.max(0,50-pos);o.src.add(src);for(const [kk,v] of Object.entries(extra||{}))if(v&&!o[kk])o[kk]=v};
-if(id){try{const d=await dz(`artist/${id}/top?limit=50`);((d&&d.data)||[]).forEach((x,i)=>add(x.title_short||x.title,'dz',i,{album:x.album?.title||'',cover:x.album?.cover_medium||'',prev:x.preview||'',dur:x.duration?`${Math.floor(x.duration/60)}:${String(x.duration%60).padStart(2,'0')}`:''}))}catch(e){}}
-if(S.settings.lf){try{const r=await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptracks&artist=${enc(name)}&autocorrect=1&limit=50&api_key=${enc(S.settings.lf)}&format=json`);const j=await r.json();((j.toptracks&&j.toptracks.track)||[]).forEach((x,i)=>add(x.name,'lf',i,{}))}catch(e){}}
-if(S.settings.yt){try{const r=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&order=viewCount&maxResults=50&q=${enc(name)}&key=${enc(S.settings.yt)}`);const j=await r.json();let i=0;const an=norm(name);
+function topTracks(name){return cached('top6:'+name+(K.spRef?':sp':'')+(S.settings.lf?':lf':'')+(S.settings.yt?':yt':''),7*DAY,async()=>{const id=await dzArtistId(name);const T={};const R={};
+/* Ogni fonte produce un valore grezzo per brano (ascolti, visualizzazioni, popolarità o posizione). Poi ogni fonte viene riportata a una scala 0–1 (1 = il suo brano più ascoltato) e si fa la media semplice: nessuna fonte pesa più delle altre. */
+const add=(t,src,raw,extra)=>{if(!t||isAlt(t))return;const k=norm(baseTitle(t));if(!k)return;
+const o=T[k]||(T[k]={t:baseTitle(t),v:{}});if(raw>(o.v[src]||0))o.v[src]=raw;for(const [kk,v] of Object.entries(extra||{}))if(v&&!o[kk])o[kk]=v};
+const zipf=i=>1/Math.pow(i+1,0.8);
+if(id){try{const d=await dz(`artist/${id}/top?limit=50`);const L=(d&&d.data)||[];R.dz=L.length;L.forEach((x,i)=>add(x.title_short||x.title,'dz',zipf(i),{album:x.album?.title||'',cover:x.album?.cover_medium||'',prev:x.preview||'',dur:x.duration?`${Math.floor(x.duration/60)}:${String(x.duration%60).padStart(2,'0')}`:''}))}catch(e){}}
+if(S.settings.lf){try{const r=await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptracks&artist=${enc(name)}&autocorrect=1&limit=50&api_key=${enc(S.settings.lf)}&format=json`);const j=await r.json();const L=(j.toptracks&&j.toptracks.track)||[];R.lf=L.length;L.forEach((x,i)=>add(x.name,'lf',+x.playcount||zipf(i),{}))}catch(e){}}
+if(S.settings.yt){try{const r=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&order=viewCount&maxResults=50&q=${enc(name)}&key=${enc(S.settings.yt)}`);const j=await r.json();const an=norm(name);const V=[];
 (j.items||[]).forEach(v=>{const ti=(v.snippet?.title||'').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"');const ch=norm(v.snippet?.channelTitle||'');if(!norm(ti).includes(an)&&!ch.includes(an))return;
-let t=ti.replace(new RegExp('^\\s*'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*[-–—:|]\\s*','i'),'').replace(/\s*[\(\[].*?[\)\]]/g,'').replace(/\s*[|｜].*$/,'').replace(/\b(official|video|lyrics?|audio|hd|4k|videoclip|ufficiale)\b.*$/i,'').trim();if(t&&norm(t)!==an)add(t,'yt',i++,{})})}catch(e){}}
-try{const sp=await spTop(name);if(sp)sp.forEach((x,i)=>add(x.name,'sp',i*2.5,{album:x.album?.name||'',cover:(x.album?.images||[]).slice(-2)[0]?.url||'',dur:x.duration_ms?`${Math.floor(x.duration_ms/60000)}:${String(Math.round(x.duration_ms/1000)%60).padStart(2,'0')}`:''}))}catch(e){}
-try{const r=await jsonp(`https://itunes.apple.com/search?term=${enc(name)}&entity=song&attribute=artistTerm&limit=60&country=it`);let i=0;((r&&r.results)||[]).filter(x=>norm(x.artistName)===norm(name)).forEach(x=>add(x.trackName,'am',i++,{album:x.collectionName||'',cover:(x.artworkUrl100||'').replace('100x100','300x300'),prev:x.previewUrl||'',dur:x.trackTimeMillis?`${Math.floor(x.trackTimeMillis/60000)}:${String(Math.round(x.trackTimeMillis/1000)%60).padStart(2,'0')}`:''}))}catch(e){}
-return Object.values(T).map(o=>({...o,score:o.score*(1+0.35*(o.src.size-1)),n:o.src.size,both:o.src.size>1,sp:o.src.has('sp'),src:undefined})).sort((a,b)=>b.score-a.score).slice(0,30)}).catch(()=>[])}
+let t=ti.replace(new RegExp('^\\s*'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*[-–—:|]\\s*','i'),'').replace(/\s*[\(\[].*?[\)\]]/g,'').replace(/\s*[|｜].*$/,'').replace(/\b(official|video|lyrics?|audio|hd|4k|videoclip|ufficiale)\b.*$/i,'').trim();if(t&&norm(t)!==an)V.push({t,id:v.id?.videoId})});
+let views={};try{const ids=V.map(x=>x.id).filter(Boolean).join(',');if(ids){const r2=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids}&key=${enc(S.settings.yt)}`);const j2=await r2.json();(j2.items||[]).forEach(x=>views[x.id]=+x.statistics?.viewCount||0)}}catch(e){}
+R.yt=V.length;V.forEach((x,i)=>add(x.t,'yt',views[x.id]||(Object.keys(views).length?0:zipf(i)),{}))}catch(e){}}
+try{const sp=await spTop(name);if(sp&&sp.length){R.sp=sp.length;const hasPop=sp.some(x=>x.popularity>0);const mx=Math.max(...sp.map(x=>x.popularity||0));
+/* la popolarità Spotify è su scala logaritmica: la riporto ad ascolti relativi */
+sp.forEach((x,i)=>add(x.name,'sp',hasPop?Math.pow(10,((x.popularity||0)-mx)/25):zipf(i),{album:x.album?.name||'',cover:(x.album?.images||[]).slice(-2)[0]?.url||'',dur:x.duration_ms?`${Math.floor(x.duration_ms/60000)}:${String(Math.round(x.duration_ms/1000)%60).padStart(2,'0')}`:''}))}}catch(e){}
+try{const r=await jsonp(`https://itunes.apple.com/search?term=${enc(name)}&entity=song&attribute=artistTerm&limit=60&country=it`);let i=0;const L=((r&&r.results)||[]).filter(x=>norm(x.artistName)===norm(name));R.am=L.length;L.forEach(x=>add(x.trackName,'am',zipf(i++),{album:x.collectionName||'',cover:(x.artworkUrl100||'').replace('100x100','300x300'),prev:x.previewUrl||'',dur:x.trackTimeMillis?`${Math.floor(x.trackTimeMillis/60000)}:${String(Math.round(x.trackTimeMillis/1000)%60).padStart(2,'0')}`:''}))}catch(e){}
+const srcs=Object.keys(R).filter(k=>R[k]>0);const MX={},MN={};srcs.forEach(k=>{const vals=Object.values(T).map(o=>o.v[k]).filter(v=>v>0);MX[k]=Math.max(...vals);MN[k]=Math.min(...vals)/MX[k]});
+const out=Object.values(T).map(o=>{const known={};srcs.forEach(k=>{if(o.v[k]>0)known[k]=o.v[k]/MX[k]});const kv=Object.values(known);const avgK=kv.length?kv.reduce((a,b)=>a+b,0)/kv.length:0;
+/* se un brano manca in una fonte: con liste lunghe (30+) vale 0; con liste corte (Spotify dà solo 10 brani) non si sa, quindi stimo con la media delle altre fonti ma mai sopra l'ultimo brano di quella lista */
+const per=srcs.map(k=>k in known?known[k]:(R[k]>=30?0:Math.min(avgK,MN[k])));const n=kv.length;
+return{...o,score:per.reduce((a,b)=>a+b,0)/srcs.length,n,both:n>1,sp:'sp' in known,v:undefined}}).filter(o=>o.n>0);
+return out.sort((a,b)=>b.score-a.score).slice(0,30)}).catch(()=>[])}
 function spBtn(a,t){return `<a class="play" style="background:rgba(30,215,96,.15);color:#1ed760" target="_blank" href="https://open.spotify.com/search/${enc((t+' '+a).replace(/\s*\(.*?\)\s*/g,' ').trim())}" title="Apri su Spotify"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.6 14.4a.6.6 0 0 1-.9.2c-2.4-1.5-5.4-1.8-9-1a.6.6 0 1 1-.3-1.2c3.9-.9 7.2-.5 9.9 1.1.3.2.4.6.3.9zm1.2-2.7a.8.8 0 0 1-1.1.3c-2.7-1.7-6.9-2.2-10.2-1.2a.8.8 0 0 1-.5-1.5c3.7-1.1 8.3-.6 11.4 1.3.4.2.5.7.4 1.1zm.1-2.8C14.7 9 9.4 8.8 6.3 9.7a.9.9 0 1 1-.5-1.8c3.5-1.1 9.4-.9 13.1 1.3a.9.9 0 0 1-1 1.7z"/></svg></a>`}
 function trackCover(a,t){const ar=a.split(', ')[0];const tt=t.replace(/\s*[\(\[].*?[\)\]]\s*/g,' ').replace(/\s+-\s+.*$/,'').trim();
 return cached('tc2:'+ar+'|'+tt,60*DAY,async()=>{for(const q of[`${ar} ${tt}`,`artist:"${ar}" track:"${tt}"`,`${tt}`]){try{const d=await dz('search/track?limit=5&q='+enc(q));const L=(d&&d.data)||[];
