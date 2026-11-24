@@ -185,6 +185,7 @@ nav.bn a.on{color:var(--gold);background:var(--card2)}
 /* sheet */
 .sheet{animation:fin .25s ease;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .sheet .in{background:var(--bg2);width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:24px 24px 0 0;padding:20px 18px calc(env(safe-area-inset-bottom) + 20px);border:1px solid var(--line)}
+.toast.long{width:min(86vw,360px);border-radius:18px;text-align:center;line-height:1.45;padding:12px 18px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 92px);z-index:70;background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow);transition:opacity .3s}
 .pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mu);background:var(--card);border:1px solid var(--line);padding:6px 12px;border-radius:999px}
 .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--gold);animation:r .8s linear infinite}
@@ -302,7 +303,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.65';
+const VER='1.66';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -515,7 +516,7 @@ const u=btn.dataset.u||await dzPreview(btn.dataset.a,btn.dataset.t);if(playingBt
 audio.src=u;audio.play().catch(()=>{});btn.classList.add('on');btn.innerHTML=I.pause};
 
 /* ---------- UI helpers ---------- */
-function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>{t.style.opacity=0;setTimeout(()=>t.remove(),300)},2200)}
+function toast(m,ms=2200){const t=document.createElement('div');t.className='toast'+(ms>3000?' long':'');t.textContent=m;document.body.appendChild(t);setTimeout(()=>{t.style.opacity=0;setTimeout(()=>t.remove(),300)},ms)}
 let progressTxt='';function setProgress(t){progressTxt=t;const e=$('#prog');if(e)e.innerHTML=t?`<span class="pill"><span class="spin"></span>${esc(t)}</span>`:''}
 function sheetX(s){const i=s.querySelector('.in');if(i&&!i.querySelector('.x')){const b=document.createElement('button');b.className='x';b.textContent='✕';b.onclick=()=>s.remove();i.prepend(b)}}
 function sheet(html){const s=document.createElement('div');s.className='sheet';s.innerHTML=`<div class="in"><button class="x" aria-label="Chiudi">✕</button>${html}</div>`;s.onclick=e=>{if(e.target===s)s.remove()};
@@ -841,7 +842,7 @@ app.innerHTML=`<div class="top"><div><h1 style="font-size:30px">La mia mensola</
 $('#colt').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{coltab=b.dataset.k;vCollection(app)});setTimeout(()=>coltab==='cd'?attachIndex():document.querySelectorAll('.azidx,.azbig').forEach(e=>e.remove()),0);
 if(!['cd','w'].includes(coltab))coltab='cd';
 if(coltab==='w'){const W=Object.entries(S.wrapped||{}).sort((a,b)=>(b[0]==='sempre')-(a[0]==='sempre')||b[0]-a[0]);
-$('#colb').innerHTML=(W.length?`<button class="card" onclick="vAllWrapped()" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin-top:14px;background:linear-gradient(135deg,rgba(30,215,96,.16),var(--card))"><div style="width:52px;height:52px;border-radius:12px;background:#1ed760;display:grid;place-items:center;flex:none"><svg viewBox="0 0 24 24" width="22" height="22" fill="#0b2414"><path d="M7 4v16l13-8z"/></svg></div><div style="flex:1"><div style="font-family:var(--serif);font-size:19px">Tutti i miei Wrapped</div><div class="small muted">${allWrapped().length} brani, una volta sola · crea la playlist su Spotify</div></div></button><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:14px">${W.map(([y,w])=>{const T=wrTracks(w).slice(0,4);return`<button class="wposter${y==='sempre'?' big':''}" onclick="vWrapped('${y}')"><div class="mos">${[0,1,2,3].map(i=>{const x=T[i];return x?`<div class="wtile ${x.img?'ok':''}" ${x.img?`style="background-image:url('${esc(x.img)}')"`:`data-tc='${esc(JSON.stringify([x.a,x.t]))}'`}></div>`:'<div class="wtile"></div>'}).join('')}</div>${w.pl?`<span onclick="event.stopPropagation();playWrapped('${y}')" style="position:absolute;top:10px;right:10px;z-index:2;width:34px;height:34px;border-radius:50%;background:#1ed760;display:grid;place-items:center;box-shadow:0 6px 16px rgba(0,0,0,.35)"><svg viewBox="0 0 24 24" width="15" height="15" fill="#0b2414"><path d="M7 4v16l13-8z"/></svg></span>`:''}<div class="lab"><div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#f2dca4;font-weight:700">${y==='sempre'?'I più ascoltati':'Il mio anno'}</div><div style="font-family:var(--serif);font-size:${y==='sempre'?34:40}px;line-height:1">${y==='sempre'?'Di sempre':y}</div><div style="font-size:11.5px;opacity:.85;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${T[0]?'n.1 '+esc(T[0].t):w.min!=null?w.min.toLocaleString('it-IT')+' minuti':''}</div></div></button>`}).join('')}</div>`:'')+
+$('#colb').innerHTML=(W.length?`<button class="card" onclick="vAllWrapped()" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin-top:14px;background:linear-gradient(135deg,rgba(30,215,96,.16),var(--card))"><div style="width:52px;height:52px;border-radius:12px;background:#1ed760;display:grid;place-items:center;flex:none"><svg viewBox="0 0 24 24" width="22" height="22" fill="#0b2414"><path d="M7 4v16l13-8z"/></svg></div><div style="flex:1"><div style="font-family:var(--serif);font-size:19px">Tutti i miei Wrapped</div><div class="small muted">${allWrapped().length} brani, una volta sola · crea la playlist su Spotify</div></div></button>${awLine()}<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:14px">${W.map(([y,w])=>{const T=wrTracks(w).slice(0,4);return`<button class="wposter${y==='sempre'?' big':''}" onclick="vWrapped('${y}')"><div class="mos">${[0,1,2,3].map(i=>{const x=T[i];return x?`<div class="wtile ${x.img?'ok':''}" ${x.img?`style="background-image:url('${esc(x.img)}')"`:`data-tc='${esc(JSON.stringify([x.a,x.t]))}'`}></div>`:'<div class="wtile"></div>'}).join('')}</div>${w.pl?`<span onclick="event.stopPropagation();playWrapped('${y}')" style="position:absolute;top:10px;right:10px;z-index:2;width:34px;height:34px;border-radius:50%;background:#1ed760;display:grid;place-items:center;box-shadow:0 6px 16px rgba(0,0,0,.35)"><svg viewBox="0 0 24 24" width="15" height="15" fill="#0b2414"><path d="M7 4v16l13-8z"/></svg></span>`:''}<div class="lab"><div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#f2dca4;font-weight:700">${y==='sempre'?'I più ascoltati':'Il mio anno'}</div><div style="font-family:var(--serif);font-size:${y==='sempre'?34:40}px;line-height:1">${y==='sempre'?'Di sempre':y}</div><div style="font-size:11.5px;opacity:.85;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${T[0]?'n.1 '+esc(T[0].t):w.min!=null?w.min.toLocaleString('it-IT')+' minuti':''}</div></div></button>`}).join('')}</div>`:'')+
 `<div class="card" style="margin-top:18px"><h3 style="font-size:19px">${W.length?'Aggiorna i tuoi anni':'I tuoi Wrapped, anno per anno'}</h3><p class="small muted" style="line-height:1.55">Le playlist <b>"I tuoi brani preferiti del…"</b> salvate nella tua libreria vengono lette quando importi da Spotify. Per avere <b>tutti gli anni</b> con minuti, artisti, brani e album: su spotify.com → Account → Privacy → <b>Scarica i tuoi dati</b>, spunta <b>Cronologia streaming estesa</b>. Quando arriva l'email (qualche giorno), carica qui i file <b>Streaming_History_Audio_….json</b>.</p>
 <label class="btn sm">Carica la cronologia<input type="file" accept=".json" multiple style="display:none" onchange="importHistory(this)"></label></div>`;fillCovers($('#colb'));return}
 $('#colb').innerHTML=coltab==='cd'?(cds.length?`<div class="tabs" style="margin-top:10px">${[['g','Per gruppo'],['a','Per album']].map(([k,l])=>`<button class="tab ${(K.cdsort||'g')===k?'on':''}" onclick="K.cdsort='${k}';saveKeys();render()">${l}</button>`).join('')}</div>`+((K.cdsort||'g')==='a'?shelfByAlbum(cds):shelfHTML(cds)):`<div class="card empty"><h3>La mensola è vuota</h3><p>Apri un album e tocca "Ce l'ho in CD", oppure aggiungili tutti insieme da un elenco.</p></div>`)
@@ -919,11 +920,37 @@ go('home');render();checkNews(true)}};draw()}
 /* Wrapped: playlist "I tuoi brani preferiti del ANNO" salvate nella libreria */
 async function spWrapped(get){let u='https://api.spotify.com/v1/me/playlists?limit=50',n=0,found=0;S.wrapped=S.wrapped||{};
 while(u&&n<10){const j=await get(u);for(const p of j.items||[]){if(!p)continue;let m=(p.name||'').match(/(top songs|brani preferiti|canzoni preferite|wrapped)\D*((19|20)\d\d)/i);let y;if(m)y=m[2];else if(/(wrapped|top songs|brani preferiti|canzoni preferite|più ascoltati)/i.test(p.name||'')&&!/(19|20)\d\d/.test(p.name||''))y='sempre';else continue;
-let items=[];for(const ep of['items','tracks']){try{const k=await get(`https://api.spotify.com/v1/playlists/${p.id}/${ep}?limit=100`);items=k.items||[];break}catch(e){}}
-const tr=items.map(x=>x.item||x.track).filter(Boolean).map(t=>({u:t.uri||'',ry:(t.album?.release_date||'').slice(0,4),t:t.name,a:(t.artists||[]).map(a=>a.name).join(', '),al:t.album?.name||'',img:(t.album?.images||[]).slice(-2)[0]?.url||''}));
-if(tr.length){const w=S.wrapped[y]||(S.wrapped[y]={});w.pl=tr;w.plName=p.name;w.plId=p.id;w.u=Date.now();found++;spWr.push(y)}else spWrErr.push(p.name)}u=j.next;n++}
+const tr=await wrReadPl(get,p.id);
+if(tr.length){storeWrapped(y,p,tr);found++;spWr.push(y)}else if(y!==awYear())spWrErr.push(p.name)}u=j.next;n++}
 if(found)save();return found}
 let spWr=[],spWrErr=[];
+/* lettura completa di una playlist Wrapped (tutte le pagine) */
+async function wrReadPl(get,id){let items=[];for(const ep of['items','tracks']){try{let u=`https://api.spotify.com/v1/playlists/${id}/${ep}?limit=100`,n=0;const acc=[];while(u&&n<10){const k=await get(u);acc.push(...(k.items||[]));u=k.next;n++}items=acc;break}catch(e){}}
+return items.map(x=>x.item||x.track).filter(t=>t&&t.name).map(t=>({u:t.uri||'',ry:(t.album?.release_date||'').slice(0,4),t:t.name,a:(t.artists||[]).map(a=>a.name).join(', '),al:t.album?.name||'',img:(t.album?.images||[]).slice(-2)[0]?.url||''}))}
+function storeWrapped(y,p,tr){S.wrapped=S.wrapped||{};const w=S.wrapped[y]||(S.wrapped[y]={});w.pl=tr;w.plName=p.name;w.plId=p.id;if(p.snapshot_id)w.snap=p.snapshot_id;w.u=Date.now();if(S.del&&S.del['w:'+y])delete S.del['w:'+y]}
+/* Wrapped dell'anno: l'app si accorge da sola quando la playlist "Wrapped ANNO" si riempie (da novembre a febbraio) */
+function awYear(){const d=new Date(),m=d.getMonth();return m>=10?String(d.getFullYear()):m<=1?String(d.getFullYear()-1):''}
+const awRe=y=>new RegExp('(top songs|brani preferiti|canzoni preferite|wrapped)\\D*'+y+'(?!\\d)','i');
+let awBusy=false;
+async function autoWrapped(force=false){const y=awYear();if(!y||awBusy||!K.spRef)return;if(!force&&Date.now()-(K.awAt||0)<5*60000)return;
+awBusy=true;try{const tok=await spToken();if(!tok)return;K.awAt=Date.now();saveKeys();const H={Authorization:'Bearer '+tok};
+const get=async u=>{for(let t=0;t<4;t++){const r=await fetch(u,{headers:H});if(r.status===429){await sleep((+r.headers.get('Retry-After')||2)*1000+300);continue}if(!r.ok)throw new Error('Spotify '+r.status);return r.json()}throw new Error('Spotify 429')};
+const w0=(S.wrapped||{})[y];const tot=p=>((p.items||p.tracks||{}).total)||0;let L=[],u='https://api.spotify.com/v1/me/playlists?limit=50',n=0;
+while(u&&n<10){const j=await get(u);(j.items||[]).forEach(p=>{if(p&&awRe(y).test(p.name||''))L.push(p)});u=j.next;n++}
+/* la sua playlist "Wrapped ANNO" ha la precedenza; poi quella già importata; poi la più piena */
+const p=L.sort((a,b)=>(/^wrapped/i.test(b.name)-/^wrapped/i.test(a.name))||((b.id===w0?.plId)-(a.id===w0?.plId))||tot(b)-tot(a))[0];
+if(!p){K.awSt='';saveKeys();return}K.awSt=tot(p)?'':'wait';K.awName=p.name;saveKeys();
+if(!tot(p))return;if(w0&&w0.plId===p.id&&w0.snap&&w0.snap===p.snapshot_id&&(w0.pl||[]).length)return;
+const before=new Set(allWrapped().map(t=>norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0])));
+const tr=await wrReadPl(get,p.id);if(!tr.length)return;storeWrapped(y,p,tr);save();
+const after=allWrapped();const nuovi=after.filter(t=>!before.has(norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]))).length;
+const gia=after.filter(t=>t.years.includes(y)&&t.years.length>1).length;
+let msg=`🎁 Wrapped ${y} importato · ${tr.length} brani, ${nuovi} nuovi nella raccolta, ${gia} già nei Wrapped passati`;
+if(S.settings.allPl&&K.spOk2){try{const ok=await syncAllWrapped(after,null,true);if(ok)msg+=' · playlist Spotify aggiornata'}catch(e){}}
+toast(msg,6000);if(route().v==='collezione')render()}catch(e){}finally{awBusy=false}}
+function awLine(){const y=awYear();if(!y||!K.spRef)return'';const w=(S.wrapped||{})[y];
+const txt=w&&(w.pl||[]).length?`<b style="color:var(--gold)">Wrapped ${y}</b> importato · ${w.pl.length} brani${w.u?' · il '+new Date(w.u).toLocaleDateString('it-IT',{day:'numeric',month:'long'}):''}. Se aggiungi altri brani alla playlist li prendo da solo.`:K.awSt==='wait'?`<b style="color:var(--gold)">Wrapped ${y}</b> · la playlist “${esc(K.awName||'Wrapped '+y)}” è ancora vuota: appena la riempi la importo da sola.`:`<b style="color:var(--gold)">Wrapped ${y}</b> · appena crei e riempi la playlist “Wrapped ${y}” la importo da sola.`;
+return `<div class="small muted" style="line-height:1.5;margin-top:10px;padding:10px 14px;border-radius:14px;border:1px solid rgba(214,179,106,.28)">${txt}</div>`}
 /* Cronologia completa dall'esportazione dati di Spotify */
 window.importHistory=async function(inp){const files=[...inp.files];if(!files.length)return;toast('Analizzo la cronologia…');const Y={};let rows=0;const PL={};
 for(const f of files){let d;try{d=JSON.parse(await f.text())}catch(e){continue}if(!Array.isArray(d))continue;
@@ -980,7 +1007,7 @@ const L=((r&&r.results)||[]).filter(x=>norm(x.artistName)===norm(a)&&norm(baseTi
 function fillYears(root){const els=[...root.querySelectorAll('[data-ry]')].filter(e=>e.querySelector('b').textContent==='…');const q=[];let busy=0;
 const run=()=>{while(busy<3&&q.length){const el=q.shift();if(!el.isConnected)continue;busy++;const [a,t]=JSON.parse(el.dataset.ry);trackYear(a,t).then(y=>{el.querySelector('b').textContent=y||'—'}).finally(()=>{busy--;run()})}};
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);q.push(e.target);run()}}),{root:root.querySelector('.in'),rootMargin:'300px'});els.forEach(el=>io.observe(el))}
-async function syncAllWrapped(L,st){const tok=await spToken();if(!tok||!K.spOk2){toast('Ricollega Spotify per dare il permesso di creare playlist');sessionStorage.setItem('sp-only',1);K.spOk2=1;saveKeys();setTimeout(spLogin,900);return}
+async function syncAllWrapped(L,st,quiet=false){const tok=await spToken();if(!tok||!K.spOk2){if(quiet)return false;toast('Ricollega Spotify per dare il permesso di creare playlist');sessionStorage.setItem('sp-only',1);K.spOk2=1;saveKeys();setTimeout(spLogin,900);return}
 const H={Authorization:'Bearer '+tok,'Content-Type':'application/json'};const say=t=>{if(st)st.textContent=t};
 try{let id=S.settings.allPl;
 if(id){const r=await fetch(`https://api.spotify.com/v1/playlists/${id}`,{headers:H});if(!r.ok)id=''}
@@ -1001,7 +1028,7 @@ if(r.ok){const j=await r.json();const it=j.tracks?.items||[];const m=it.find(x=>
 await sleep(120);if(uri)t.u=uri}
 const tk=norm(baseTitle(t.t))+'|'+norm((t.a||'').split(', ')[0]);if(uri&&!have.has(uri)&&!haveK.has(tk)&&!uris.includes(uri)){uris.push(uri);haveK.add(tk)}}
 for(let k=0;k<uris.length;k+=100){say(`Aggiungo i brani… ${Math.min(k+100,uris.length)}/${uris.length}`);const body=JSON.stringify({uris:uris.slice(k,k+100)});let r=await fetch(`https://api.spotify.com/v1/playlists/${id}/items`,{method:'POST',headers:H,body});if(!r.ok)r=await fetch(`https://api.spotify.com/v1/playlists/${id}/tracks`,{method:'POST',headers:H,body});if(!r.ok){let m='';try{m=(await r.json()).error?.message||''}catch(e){}throw new Error('Spotify '+r.status+(m?': '+m:''))}}
-const miss=L.filter(t=>!t.u).length;say((dupU.length?`Tolti ${dupU.length} doppioni. `:'')+(uris.length?`Fatto: ${uris.length} brani aggiunti.`:'La playlist è già aggiornata.')+(miss?` ${miss} brani non trovati su Spotify.`:''));toast('Playlist pronta su Spotify 🎧')}catch(e){say('Spotify non ha permesso di creare o modificare la playlist ('+e.message+'). Usa "Copia l\'elenco".')}}
+const miss=L.filter(t=>!t.u).length;say((dupU.length?`Tolti ${dupU.length} doppioni. `:'')+(uris.length?`Fatto: ${uris.length} brani aggiunti.`:'La playlist è già aggiornata.')+(miss?` ${miss} brani non trovati su Spotify.`:''));if(!quiet)toast('Playlist pronta su Spotify 🎧');return true}catch(e){if(quiet)return false;say('Spotify non ha permesso di creare o modificare la playlist ('+e.message+'). Usa "Copia l\'elenco".')}}
 window.vWrapped=vWrapped;
 async function spToMb(c){try{const j=await mb(`url?resource=${enc('https://open.spotify.com/artist/'+c.id)}&inc=artist-rels`);const r=(j.relations||[]).find(x=>x.artist);if(r)return{id:r.artist.id,name:r.artist.name}}catch(e){}
 try{const j=await mb(`artist?query=${enc('artist:"'+c.name+'"')}&limit=5`);const a=(j.artists||[]).find(x=>norm(x.name)===norm(c.name)&&x.score>=90);if(a)return{id:a.id,name:a.name}}catch(e){}return null}
@@ -1015,14 +1042,14 @@ async function ghPut(sha){const bytes=new TextEncoder().encode(JSON.stringify(S)
 const r=await fetch(ghU(),{method:'PUT',headers:ghH(),body:JSON.stringify({message:'OutLoud! sync',content:btoa(bin),...(sha?{sha}:{})})});if(!r.ok)throw new Error('GitHub '+r.status)}
 let syncing=false;
 function fixWrapped(){const w=S.wrapped||{};
-if(w['2026']&&w.sempre&&!w['2026'].min){const k=x=>new Set((x.pl||[]).map(t=>norm(t.t)+norm(t.a)));const a=k(w['2026']),b=k(w.sempre);let c=0;a.forEach(x=>b.has(x)&&c++);if(a.size&&c/a.size>0.7){delete w['2026'];tomb('w:2026');save();return}}if(w['2026']&&w['2026'].plName&&!/(19|20)\d\d/.test(w['2026'].plName)&&!w['2026'].min){w.sempre=w['2026'];delete w['2026'];save()}}
+if(w['2026']&&w.sempre&&!w['2026'].min&&!/(19|20)\d\d/.test(w['2026'].plName||'')){const k=x=>new Set((x.pl||[]).map(t=>norm(t.t)+norm(t.a)));const a=k(w['2026']),b=k(w.sempre);let c=0;a.forEach(x=>b.has(x)&&c++);if(a.size&&c/a.size>0.7){delete w['2026'];tomb('w:2026');save();return}}if(w['2026']&&w['2026'].plName&&!/(19|20)\d\d/.test(w['2026'].plName)&&!w['2026'].min){w.sempre=w['2026'];delete w['2026'];save()}}
 function mergeState(L,R){if(!R)return L;const out=Object.assign(blank(),R,L);const del=Object.assign({},R.del||{},L.del||{});
 for(const k in del){const o=(L.del||{})[k]||0,r=(R.del||{})[k]||0;del[k]=Math.max(o,r)}
 const mm=(a,b,pre)=>{const o={};for(const k of new Set([...Object.keys(a||{}),...Object.keys(b||{})])){const x=(a||{})[k],y=(b||{})[k];const w=!x?y:!y?x:((x.u||0)>=(y.u||0)?x:y);if(del[pre+k]&&del[pre+k]>(w.u||w.addedAt||0))continue;o[k]=w}return o};
 out.artists=mm(L.artists,R.artists,'a:');out.albums=mm(L.albums,R.albums,'b:');
 const dm={};[...(R.diary||[]),...(L.diary||[])].forEach(c=>{const p=dm[c.id];if(!p||(c.u||0)>=(p.u||0))dm[c.id]=c});out.diary=Object.values(dm).filter(c=>!(del['c:'+c.id]&&del['c:'+c.id]>(c.u||0)));
 out.seen=Object.assign({},R.seen||{},L.seen||{});for(const k in out.seen)if((R.seen||{})[k]==='old'||(L.seen||{})[k]==='old')out.seen[k]='old';
-out.seenGigs=Object.assign({},R.seenGigs||{},L.seenGigs||{});out.wrapped=Object.assign({},R.wrapped||{},L.wrapped||{});for(const y in out.wrapped)if(del['w:'+y])delete out.wrapped[y];
+out.seenGigs=Object.assign({},R.seenGigs||{},L.seenGigs||{});out.wrapped=Object.assign({},R.wrapped||{},L.wrapped||{});for(const y in out.wrapped)if(del['w:'+y]&&del['w:'+y]>(out.wrapped[y].u||0))delete out.wrapped[y];
 out.prioDone=[...new Set([...(R.prioDone||[]),...(L.prioDone||[])])];
 const sl=L.settings||{},sr=R.settings||{};out.settings={};for(const k of new Set([...Object.keys(sr),...Object.keys(sl)]))out.settings[k]=sl[k]||sr[k]||'';
 out.lastCheck=Math.max(L.lastCheck||0,R.lastCheck||0);out.lastGigs=Math.max(L.lastGigs||0,R.lastGigs||0);out.del=del;out.updatedAt=Math.max(L.updatedAt||0,R.updatedAt||0);return out}
@@ -1100,8 +1127,8 @@ $('#wall').innerHTML=html;$('#wall').classList.add('on')}}
 /* ---------- avvio ---------- */
 applyTheme();try{fixWrapped()}catch(e){}intro();render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-(async()=>{await spCallback();if(K.gh){try{await syncNow()}catch(e){}}setTimeout(async()=>{await initPrio();await checkNews();checkGigs()},1500)})();
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(K.gh)syncNow().catch(()=>{});checkNews()}});
+(async()=>{await spCallback();if(K.gh){try{await syncNow()}catch(e){}}setTimeout(async()=>{await initPrio();autoWrapped();await checkNews();checkGigs()},1500)})();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){(K.gh?syncNow().catch(()=>{}):Promise.resolve()).then(()=>autoWrapped());checkNews()}});
 </script>
 </body>
 </html>
