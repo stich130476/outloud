@@ -302,7 +302,7 @@ nav.bn{width:560px}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.64';
+const VER='1.65';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -473,7 +473,7 @@ if(!id){const r=await fetch(`https://api.spotify.com/v1/search?type=artist&limit
 const r=await fetch(`https://api.spotify.com/v1/artists/${id}/top-tracks?market=IT`,{headers:H});if(!r.ok)return null;const j=await r.json();return j.tracks||null}
 window.spConnect=()=>{sessionStorage.setItem('sp-only',1);spLogin()};
 /* brani migliori: classifica incrociata Deezer (ascolti) + Apple Music (popolarità) */
-function topTracks(name){return cached('top6:'+name+(K.spRef?':sp':'')+(S.settings.lf?':lf':'')+(S.settings.yt?':yt':''),7*DAY,async()=>{const id=await dzArtistId(name);const T={};const R={};
+function topTracks(name){return cached('top7:'+name+(K.spRef?':sp':'')+(S.settings.lf?':lf':'')+(S.settings.yt?':yt':''),7*DAY,async()=>{const id=await dzArtistId(name);const T={};const R={};
 /* Ogni fonte produce un valore grezzo per brano (ascolti, visualizzazioni, popolarità o posizione). Poi ogni fonte viene riportata a una scala 0–1 (1 = il suo brano più ascoltato) e si fa la media semplice: nessuna fonte pesa più delle altre. */
 const add=(t,src,raw,extra)=>{if(!t||isAlt(t))return;const k=norm(baseTitle(t));if(!k)return;
 const o=T[k]||(T[k]={t:baseTitle(t),v:{}});if(raw>(o.v[src]||0))o.v[src]=raw;for(const [kk,v] of Object.entries(extra||{}))if(v&&!o[kk])o[kk]=v};
@@ -493,7 +493,9 @@ const srcs=Object.keys(R).filter(k=>R[k]>0);const MX={},MN={};srcs.forEach(k=>{c
 const out=Object.values(T).map(o=>{const known={};srcs.forEach(k=>{if(o.v[k]>0)known[k]=o.v[k]/MX[k]});const kv=Object.values(known);const avgK=kv.length?kv.reduce((a,b)=>a+b,0)/kv.length:0;
 /* se un brano manca in una fonte: con liste lunghe (30+) vale 0; con liste corte (Spotify dà solo 10 brani) non si sa, quindi stimo con la media delle altre fonti ma mai sopra l'ultimo brano di quella lista */
 const per=srcs.map(k=>k in known?known[k]:(R[k]>=30?0:Math.min(avgK,MN[k])));const n=kv.length;
-return{...o,score:per.reduce((a,b)=>a+b,0)/srcs.length,n,both:n>1,sp:'sp' in known,v:undefined}}).filter(o=>o.n>0);
+/* con 4+ fonti tolgo il valore più alto e il più basso di ogni brano (media troncata): un video virale o un'anomalia di un solo sito non falsano la classifica */
+const ps=[...per].sort((a,b)=>a-b);const use=ps.length>=4?ps.slice(1,-1):ps;
+return{...o,score:use.reduce((a,b)=>a+b,0)/use.length,n,both:n>1,sp:'sp' in known,v:undefined}}).filter(o=>o.n>0);
 return out.sort((a,b)=>b.score-a.score).slice(0,30)}).catch(()=>[])}
 function spBtn(a,t){return `<a class="play" style="background:rgba(30,215,96,.15);color:#1ed760" target="_blank" href="https://open.spotify.com/search/${enc((t+' '+a).replace(/\s*\(.*?\)\s*/g,' ').trim())}" title="Apri su Spotify"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.6 14.4a.6.6 0 0 1-.9.2c-2.4-1.5-5.4-1.8-9-1a.6.6 0 1 1-.3-1.2c3.9-.9 7.2-.5 9.9 1.1.3.2.4.6.3.9zm1.2-2.7a.8.8 0 0 1-1.1.3c-2.7-1.7-6.9-2.2-10.2-1.2a.8.8 0 0 1-.5-1.5c3.7-1.1 8.3-.6 11.4 1.3.4.2.5.7.4 1.1zm.1-2.8C14.7 9 9.4 8.8 6.3 9.7a.9.9 0 1 1-.5-1.8c3.5-1.1 9.4-.9 13.1 1.3a.9.9 0 0 1-1 1.7z"/></svg></a>`}
 function trackCover(a,t){const ar=a.split(', ')[0];const tt=t.replace(/\s*[\(\[].*?[\)\]]\s*/g,' ').replace(/\s+-\s+.*$/,'').trim();
