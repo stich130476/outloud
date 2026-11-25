@@ -63,6 +63,16 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0;letter-spacing:-.01em
 .news .a{font-size:12px!important}
 .news .m .chip{font-size:10.5px;padding:3px 8px}
 .news.prio .cov{box-shadow:0 0 0 2px var(--gold),var(--shadow)}
+.news .cov .vbadge{position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:99px;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:#1a130a;background:linear-gradient(120deg,#fff1c9,#e2bb6a);box-shadow:0 4px 12px rgba(0,0,0,.35)}
+.vlist{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin-bottom:8px}
+.vrow{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);cursor:pointer;color:var(--tx)}
+.vrow.cur{border-color:rgba(214,179,106,.55)}.vrow.mine{background:linear-gradient(135deg,rgba(214,179,106,.16),var(--card))}
+.vrow .vtx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.vrow .vtx b{font-family:var(--serif);font-weight:500;font-size:16px}
+.vrow .vtx span{font-size:12px;color:var(--mu)}.vrow .vtx em{font-style:normal;color:var(--gold);font-weight:700}
+.vmine{flex:none;font-size:12px;font-weight:600;padding:7px 11px;border-radius:99px;border:1px solid var(--line);color:var(--mu)}
+.vrow.mine .vmine{color:#1a130a;background:linear-gradient(120deg,#fff1c9,#e2bb6a);border-color:transparent}
+.vrow.sib{opacity:.92}.vgo{color:var(--gold);font-size:22px;font-family:var(--serif)}
+.vextra{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:700;color:var(--gold);border:1px solid rgba(214,179,106,.5);vertical-align:2px}
 .av .pic.prio{border-color:var(--gold)}
 .prioStar{color:var(--gold);font-size:12px}
 .news .t{font-family:var(--serif);font-size:17px;margin-top:10px;line-height:1.2}
@@ -347,7 +357,7 @@ html{scrollbar-color:rgba(214,179,106,.3) transparent}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.72';
+const VER='1.73';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -502,7 +512,8 @@ function edKey(t){return norm(baseTitle(String(t||'').replace(/\s*[\(\[][^\)\]]*
 function dedupNews(L){const rank=x=>{const ty=typeOf(x);return (covMap[x.id]==='-'?100:0)+(EDRE.test(x.t)?10:0)+(ty==='Album'?0:ty==='EP'?1:ty==='Singolo'?2:3)};
 const byId={};L.forEach(x=>{const o=byId[x.id];if(!o)byId[x.id]={...x,artists:[x.artist]};else if(!o.artists.includes(x.artist)){o.artists.push(x.artist);if(isPrio(x.aid)&&!isPrio(o.aid))o.aid=x.aid}});
 const G={};Object.values(byId).forEach(x=>{const k=edKey(x.t)+'|'+norm(x.artists.slice().sort()[0]);(G[k]=G[k]||[]).push(x)});
-return Object.values(G).map(g=>{const best=g.slice().sort((a,b)=>rank(a)-rank(b)||a.d.localeCompare(b.d))[0];const d=g.map(x=>x.d).sort()[0];return {...best,d:best.d||d,artist:best.artists.join(' & '),dup:g.length}}).sort((a,b)=>b.d.localeCompare(a.d))}
+return Object.values(G).map(g=>{const best=g.slice().sort((a,b)=>rank(a)-rank(b)||a.d.localeCompare(b.d))[0];const d=g.map(x=>x.d).sort()[0];const oth=g.filter(x=>x!==best);const ed=oth.map(x=>(x.t.match(EDRE)||[])[0]).find(Boolean);const vl=!oth.length?'':ed?'+ '+ed.replace(/^./,c=>c.toUpperCase()):oth.length===1?'+ '+typeOf(oth[0]):(g.length+' versioni');
+return {...best,d:best.d||d,artist:best.artists.join(' & '),dup:g.length,vl}}).sort((a,b)=>b.d.localeCompare(a.d))}
 async function onThisDay(){const md=today().slice(5),y=+today().slice(0,4),out=[];
 for(const id of Object.keys(S.artists)){const c=await idb.get('disc:'+id);if(!c)continue;for(const r of c.v){const ty=typeOf(r);if((ty==='Album'||ty==='EP')&&r.d.length===10&&r.d.slice(5)===md&&+r.d.slice(0,4)<y)out.push({...r,artist:S.artists[id].name,aid:id,yrs:y-+r.d.slice(0,4)})}}
 return out.sort((a,b)=>b.yrs-a.yrs)}
@@ -621,7 +632,7 @@ setProgress(progressTxt);if(!n)return;
 const news=dedupNews(await newsList());if(!ok())return;
 const fut=news.filter(x=>x.d>today()).sort((a,b)=>a.d.localeCompare(b.d)),past=news.filter(x=>x.d<=today());
 const nnew=news.filter(x=>S.seen[x.id]==='new').length;
-const card=x=>`<a class="news${isPrio(x.aid)?' prio':''}" href="#album/${x.id}"><div class="cov">${coverImg(x.id,x.artist,x.t,500)}${S.seen[x.id]==='new'?'<span class="badge">Nuovo</span>':''}</div><div class="t">${esc(x.t)}</div><div class="a">${isPrio(x.aid)?'<span class="prioStar">★</span> ':''}${esc(x.artist)}</div><div class="m"><span class="chip" style="margin:0">${typeOf(x)}</span>${whenBadge(x.d)||`<span class="small muted">${fmtDate(x.d)}</span>`}</div></a>`;
+const card=x=>`<a class="news${isPrio(x.aid)?' prio':''}" href="#album/${x.id}"><div class="cov">${coverImg(x.id,x.artist,x.t,500)}${S.seen[x.id]==='new'?'<span class="badge">Nuovo</span>':''}${x.vl?`<span class="vbadge">${esc(x.vl)}</span>`:''}</div><div class="t">${esc(x.t)}</div><div class="a">${isPrio(x.aid)?'<span class="prioStar">★</span> ':''}${esc(x.artist)}</div><div class="m"><span class="chip" style="margin:0">${typeOf(x)}</span>${whenBadge(x.d)||`<span class="small muted">${fmtDate(x.d)}</span>`}</div></a>`;
 const otd=await onThisDay();if(!ok())return;
 let html='';const cdl=Object.entries(S.albums).filter(([,v])=>v.cd);
 if(cdl.length){cdl.sort((a,b)=>a[0].localeCompare(b[0]));const [did,dv]=cdl[dayHash(today())%cdl.length];
@@ -850,24 +861,40 @@ app.innerHTML=`<a class="iconbtn back" href="javascript:history.back()">${I.back
 <button class="btn sm ghost" id="cdb" onclick="toggleCD()">${mine.cd?'✓ Ce l\'ho in CD':'Ce l\'ho in CD'}</button></div></div></div>
 <div class="sec"><h2>Le mie note</h2></div>
 <textarea id="note" rows="3" placeholder="Un ricordo, un pensiero, il brano preferito…" style="margin-top:12px">${esc(mine.n||'')}</textarea>
-<div id="info"></div><div class="sec"><h2>Tracce</h2><span class="small muted">tocca ▶ per 30 secondi</span></div><div id="ed"></div><div id="trk">${loading}</div>`;
+<div id="info"></div><div id="ed"></div><div class="sec"><h2>Tracce<span id="trkv" class="small" style="font-family:var(--sans);color:var(--gold);font-weight:600;margin-left:10px"></span></h2><span class="small muted">tocca ▶ per 30 secondi</span></div><div id="trk">${loading}</div>`;
 const drawStars=()=>{if(!$('#stars'))return;$('#stars').innerHTML=[1,2,3,4,5].map(i=>`<button class="${(S.albums[rgid]?.r||0)>=i?'on':''}" data-i="${i}">★</button>`).join('');$('#stars').querySelectorAll('button').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;setAlb(rgid,{r:(S.albums[rgid]?.r===i?0:i)},rg,artist,aid);drawStars()})};drawStars();
 $('#note').onchange=e=>setAlb(rgid,{n:e.target.value.trim()},rg,artist,aid);
 window.toggleCD=()=>{setAlb(rgid,{cd:!S.albums[rgid]?.cd},rg,artist,aid);$('#cdb').textContent=S.albums[rgid]?.cd?'✓ Ce l\'ho in CD':'Ce l\'ho in CD';toast(S.albums[rgid]?.cd?'Aggiunto alla tua mensola':'Tolto dalla mensola')};
 if(!rels.length){$('#trk').innerHTML='<div class="card muted">Elenco tracce non disponibile.</div>';return}
-let eds=[];try{const bj=await mbc(`release?release-group=${rgid}&inc=media&limit=100`,30*DAY);eds=(bj.releases||[]).map(r=>({id:r.id,t:r.title,dis:r.disambiguation||'',d:r.date||'',c:r.country||'',n:(r.media||[]).reduce((x,m)=>x+(m['track-count']||0),0),m:(r.media||[]).length,st:r.status}))}catch(e){}
-if(!ok())return;const seen={};eds=eds.filter(e=>e.st!=='Bootleg'&&e.n).sort((x,y)=>(x.d||'9999').localeCompare(y.d||'9999')).filter(e=>{const k=e.t+'|'+e.dis+'|'+e.n;if(seen[k])return false;seen[k]=1;return true});
+let eds=[];try{const bj=await mbc(`release?release-group=${rgid}&inc=media&limit=100`,30*DAY);eds=(bj.releases||[]).map(r=>{const md=r.media||[];return{id:r.id,t:r.title,dis:r.disambiguation||'',d:r.date||'',c:r.country||'',n:md.reduce((x,m)=>x+(m['track-count']||0),0),m:md.length,st:r.status,f:[...new Set(md.map(m=>m.format||''))]}})}catch(e){}
+if(!ok())return;
+/* edizioni: niente vinili e cassette; stesse caratteristiche = una riga sola */
+const fmt=e=>{const F=e.f.join(' ');if(/vinyl|cassette|8-track/i.test(F)&&!/cd|digital/i.test(F))return'';return /cd|sacd/i.test(F)?(e.m>1?e.m+' CD':'CD'):/digital/i.test(F)?'Digitale':(F||'CD')};
+const edName=e=>{const x=(e.dis+' '+(norm(e.t)!==norm(rg.title)?e.t:'')).toLowerCase();
+const L=[[/super deluxe/,'Super Deluxe'],[/deluxe/,'Deluxe'],[/expanded|espans/,'Espansa'],[/anniversary|anniversario/,'Anniversario'],[/remaster|rimaster/,'Rimasterizzata'],[/limited|limitat/,'Limitata'],[/special|speciale/,'Speciale'],[/japan|giappon/,'Giapponese'],[/bonus/,'Con brani bonus'],[/tour/,'Edizione tour'],[/live/,'Con live']];
+const hit=L.find(([re])=>re.test(x));return hit?hit[1]:(e.dis?e.dis.charAt(0).toUpperCase()+e.dis.slice(1):'Standard')};
+const G={};eds.filter(e=>e.st!=='Bootleg'&&e.n).forEach(e=>{const f=fmt(e);if(!f)return;const k=edName(e)+'|'+f+'|'+e.n;const o=G[k];if(!o||(e.d||'9999')<(o.d||'9999'))G[k]={...e,fm:f,nm:edName(e),cc:new Set([...(o?o.cc:[]),e.c].filter(Boolean))};else if(e.c)o.cc.add(e.c)});
+eds=Object.values(G).sort((a,b)=>(a.nm==='Standard'?0:1)-(b.nm==='Standard'?0:1)||(a.d||'9999').localeCompare(b.d||'9999')||a.n-b.n);
+const std=eds.filter(e=>e.nm==='Standard').sort((a,b)=>a.n-b.n)[0]||eds.slice().sort((a,b)=>a.n-b.n)[0];
+const stdTitles=std?mbc(`release/${std.id}?inc=recordings`,30*DAY).then(r=>new Set((r.media||[]).flatMap(m=>(m.tracks||[]).map(t=>norm(baseTitle(t.title)))))).catch(()=>null):Promise.resolve(null);
 const loadRel=async relId=>{$('#trk').innerHTML=loading;let rel;try{rel=await mbc(`release/${relId}?inc=recordings+labels+artist-rels`,30*DAY)}catch(e){$('#trk').innerHTML='<div class="card muted">Elenco tracce non disponibile.</div>';return}if(!ok())return;
+const ST=std&&relId!==std.id?await stdTitles:null;if(!ok())return;{const ev=eds.find(e=>e.id===relId);const tv=$('#trkv');if(tv)tv.textContent=ev&&eds.length>1?ev.nm+' · '+ev.fm:''}
 const ms=x=>x?`${Math.floor(x/60000)}:${String(Math.round(x/1000)%60).padStart(2,'0')}`:'';let tot=0;const media=rel.media||[];
-$('#trk').innerHTML=media.map((m,mi)=>`${media.length>1?`<div class="dec">${esc(m.title||m.format||'Disco')} ${m.title?'':mi+1}</div>`:''}${(m.tracks||[]).map(t=>{tot+=t.length||0;return`<div class="trk"><span class="no">${esc(t.number)}</span><span class="tt">${esc(t.title)}</span><span class="du">${ms(t.length)}</span><button class="play" data-a="${esc(artist)}" data-t="${esc(t.title)}" onclick="playPrev(this)">${I.play}</button>${spBtn(artist,t.title)}</div>`}).join('')}`).join('');
+$('#trk').innerHTML=media.map((m,mi)=>`${media.length>1?`<div class="dec">${esc(m.title||m.format||'Disco')} ${m.title?'':mi+1}</div>`:''}${(m.tracks||[]).map(t=>{tot+=t.length||0;const extra=ST&&!ST.has(norm(baseTitle(t.title)));return`<div class="trk"><span class="no">${esc(t.number)}</span><span class="tt">${esc(t.title)}${extra?' <span class="vextra">in più</span>':''}</span><span class="du">${ms(t.length)}</span><button class="play" data-a="${esc(artist)}" data-t="${esc(t.title)}" onclick="playPrev(this)">${I.play}</button>${spBtn(artist,t.title)}</div>`}).join('')}`).join('');
 const labels=[...new Set((rel['label-info']||[]).map(l=>l.label?.name).filter(Boolean))];const prod=[...new Set((rel.relations||[]).filter(r=>r.type==='producer').map(r=>r.artist?.name))];
 const ntr=media.reduce((s,m)=>s+(m.tracks||[]).length,0);
-$('#info').innerHTML=`<div class="stats" style="margin-top:22px"><div class="stat"><b>${rg['first-release-date']?fmtDate(rg['first-release-date']).replace(/ \d{4}$/,'')||'—':'—'}</b><span>uscita ${rg['first-release-date']?.slice(0,4)||''}</span></div><div class="stat"><b>${ntr}</b><span>tracce${media.length>1?` · ${media.length} dischi`:''}</span></div>${tot?`<div class="stat"><b>${Math.round(tot/60000)}′</b><span>durata totale</span></div>`:''}${labels.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(labels.slice(0,2).join(', '))}</b><span>etichetta</span></div>`:''}${prod.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(prod.slice(0,2).join(', '))}</b><span>produzione</span></div>`:''}<div class="stat"><b>${eds.length||rels.length}</b><span>edizioni pubblicate</span></div></div>`};
-const mineRel=S.albums[rgid]?.rel;const cur=(mineRel&&eds.find(e=>e.id===mineRel))?mineRel:(eds[0]?.id||rels[0].id);
-if(eds.length>1){const lab=e=>`${e.dis?e.dis.charAt(0).toUpperCase()+e.dis.slice(1):e.t}${e.d?' · '+e.d.slice(0,4):''}${e.c&&e.c!=='XW'?' · '+e.c:''} · ${e.n} brani${e.m>1?' ('+e.m+' dischi)':''}`;
-$('#ed').innerHTML=`<div class="field" style="margin-bottom:6px"><label>Edizione${mineRel?' · <span style="color:var(--gold)">la tua</span>':''}</label><select id="edsel">${eds.map(e=>`<option value="${e.id}" ${e.id===cur?'selected':''}>${esc(lab(e))}</option>`).join('')}</select></div>`;
-$('#edsel').onchange=e=>{setAlb(rgid,{rel:e.target.value},rg,artist,aid);loadRel(e.target.value);toast('Edizione salvata')}}
-loadRel(cur)}
+$('#info').innerHTML=`<div class="stats" style="margin-top:22px"><div class="stat"><b>${rg['first-release-date']?fmtDate(rg['first-release-date']).replace(/ \d{4}$/,'')||'—':'—'}</b><span>uscita ${rg['first-release-date']?.slice(0,4)||''}</span></div><div class="stat"><b>${ntr}</b><span>tracce${media.length>1?` · ${media.length} dischi`:''}</span></div>${tot?`<div class="stat"><b>${Math.round(tot/60000)}′</b><span>durata totale</span></div>`:''}${labels.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(labels.slice(0,2).join(', '))}</b><span>etichetta</span></div>`:''}${prod.length?`<div class="stat"><b style="font-size:16px;line-height:1.3">${esc(prod.slice(0,2).join(', '))}</b><span>produzione</span></div>`:''}</div>`};
+/* le versioni: edizioni di questo disco + uscite sorelle (deluxe pubblicata a parte, singolo omonimo…) */
+let sib=[];try{const dc=aid&&await idb.get('disc:'+aid);sib=((dc&&dc.v)||[]).filter(r=>r.id!==rgid&&edKey(r.t)===edKey(rg.title))}catch(e){}
+const mineRel=S.albums[rgid]?.rel;let view=(mineRel&&eds.find(e=>e.id===mineRel))?mineRel:(std?.id||eds[0]?.id||rels[0].id);
+const drawEd=()=>{const m=S.albums[rgid]?.rel;const has=eds.length>1||sib.length;if(!has){$('#ed').innerHTML='';return}
+$('#ed').innerHTML=`<div class="sec" style="margin-top:6px"><h2>Versioni</h2><span class="small muted">${eds.length+sib.length} in tutto</span></div>
+${S.albums[rgid]?.cd&&!m?'<div class="small" style="color:var(--gold);margin:-4px 0 10px">Ce l\'hai in CD: scegli qui sotto quale versione hai a casa.</div>':''}
+<div class="vlist">${eds.map(e=>{const plus=std&&e.id!==std.id?e.n-std.n:0;const on=e.id===m,cur=e.id===view;return `<div class="vrow${cur?' cur':''}${on?' mine':''}" data-id="${e.id}"><div class="vtx"><b>${esc(e.nm)}</b><span>${esc(e.fm)} · ${e.n} brani${plus>0?` <em>+${plus}</em>`:''}${e.d?' · '+e.d.slice(0,4):''}${e.cc.size?' · '+[...e.cc].slice(0,3).map(c=>c==='XW'?'mondo':c==='XE'?'Europa':c).join(', ')+(e.cc.size>3?'…':''):''}</span></div><button class="vmine" data-id="${e.id}">${on?'✓ La mia copia':'È la mia'}</button></div>`}).join('')}
+${sib.map(r=>`<a class="vrow sib" href="#album/${r.id}"><div class="vtx"><b>${esc(typeOf(r))}${EDRE.test(r.t)?' · '+esc(r.t.match(EDRE)[0].replace(/^./,c=>c.toUpperCase())):''}</b><span>${esc(r.t)}${r.d?' · '+r.d.slice(0,4):''} · uscita a parte</span></div><span class="vgo">›</span></a>`).join('')}</div>`;
+$('#ed').querySelectorAll('.vrow[data-id]').forEach(r=>r.onclick=e=>{if(e.target.closest('.vmine'))return;view=r.dataset.id;drawEd();loadRel(view)});
+$('#ed').querySelectorAll('.vmine').forEach(b=>b.onclick=()=>{const id=b.dataset.id;const was=S.albums[rgid]?.rel===id;setAlb(rgid,was?{rel:''}:{rel:id,cd:true},rg,artist,aid);if(!was){view=id;loadRel(id)}$('#cdb').textContent=S.albums[rgid]?.cd?'✓ Ce l\'ho in CD':'Ce l\'ho in CD';toast(was?'Versione tolta':'Salvata la tua versione: '+(eds.find(e=>e.id===id)?.nm||''));drawEd()})};
+drawEd();loadRel(view)}
 function setAlb(id,patch,rg,artist,aid){const cur=S.albums[id]||{t:rg.title,a:artist,aid,d:rg['first-release-date']||''};Object.assign(cur,patch);cur.u=Date.now();if(!cur.cd&&!cur.r&&!cur.n&&!cur.rel){delete S.albums[id];tomb('b:'+id)}else{S.albums[id]=cur;if(S.del)delete S.del['b:'+id]}save()}
 
 /* ---------- RICERCA ---------- */
