@@ -345,7 +345,7 @@ html{scrollbar-color:rgba(214,179,106,.3) transparent}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.69';
+const VER='1.70';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -407,12 +407,14 @@ function clean(){clearTimeout(to);delete window[cb];s.remove()}window[cb]=d=>{cl
 s.src='https://api.deezer.com/'+path+(path.includes('?')?'&':'?')+'output=jsonp&callback='+cb;document.head.appendChild(s)})}
 /* Deezer accetta circa 50 richieste ogni 5 secondi: le metto in fila (8 al secondo) e riprovo se è occupato */
 function dz(path){const p=dzChain.then(async()=>{const w=dzLast+125-Date.now();if(w>0)await sleep(w);dzLast=Date.now()}).then(async()=>{for(let t=0;t<3;t++){try{return await dzRaw(path)}catch(e){if(t===2)throw e;await sleep(1500*(t+1))}}});dzChain=p.catch(()=>{});return p}
+/* Deezer: l'immagine segnaposto (hash del file vuoto) non è una foto vera */
+const DZBLANK=/d41d8cd98f00b204e9800998ecf8427e|\/(artist|cover)\/\//;const dzImg=u=>u&&!DZBLANK.test(u)?u:'';
 const photoMem={};
 function artistPhoto(name){if(!name)return Promise.resolve('');if(photoMem[name])return photoMem[name];
-return photoMem[name]=(async()=>{const key='ph2:'+name;const c=await idb.get(key);if(c&&(c.v?Date.now()-c.t<30*DAY:(c.r===3&&Date.now()-c.t<2*DAY)))return c.v;
+return photoMem[name]=(async()=>{const key='ph2:'+name;const c=await idb.get(key);if(c&&(c.v?Date.now()-c.t<30*DAY&&!DZBLANK.test(c.v):(c.r===3&&Date.now()-c.t<2*DAY)))return c.v;
 /* Deezer per nome esatto (anche senza punti: "C.S.I." = "CSI") */
-const dzFind=async n=>{const d=await dz('search/artist?limit=8&q='+enc(n));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(n))||L.find(a=>norm(a.name).startsWith(norm(n))&&norm(n).length>4)||null;const x=m&&m.picture_xl;return x&&!/\/artist\/\//.test(x)?x:''};
-let u='';try{u=await dzFind(name)}catch(e){if(c&&c.v)return c.v}
+const dzFind=async n=>{const d=await dz('search/artist?limit=8&q='+enc(n));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(n))||L.find(a=>norm(a.name).startsWith(norm(n))&&norm(n).length>4)||null;return dzImg(m&&m.picture_xl)};
+let u='';try{u=await dzFind(name)}catch(e){if(c&&c.v&&!DZBLANK.test(c.v))return c.v}
 const a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));
 /* Spotify: stesso artista per codice, nessun rischio di omonimi */
 if(!u&&a&&a.spotifyId){try{const tok=await spToken();if(tok){const r=await fetch(`https://api.spotify.com/v1/artists/${a.spotifyId}`,{headers:{Authorization:'Bearer '+tok}});if(r.ok){const j=await r.json();u=((j.images||[])[0]||{}).url||''}}}catch(e){}}
@@ -424,7 +426,7 @@ if(!u){const wd=(j.relations||[]).find(r=>r.type==='wikidata');if(wd){const w=aw
 /* ultima risorsa: la copertina del primo album in studio (stesso artista, per codice MusicBrainz) */
 if(!u&&a&&a.mbid){try{const D=await discography(a.mbid,false);const al=D.filter(r=>typeOf(r)==='Album'&&r.d&&covMap[r.id]!=='-').sort((x,y)=>x.d.localeCompare(y.d))[0];if(al)u=covMap[al.id]||caa(al.id,250)}catch(e){}}
 await idb.set(key,{t:Date.now(),v:u,r:3});return u})().catch(()=>'')}
-function dzCover(artist,title){return cached('dzc:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/album?limit=5&q='+enc(`artist:"${artist}" album:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.cover_xl)||''}).catch(()=>'')}
+function dzCover(artist,title){return cached('dzc2:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/album?limit=5&q='+enc(`artist:"${artist}" album:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return dzImg(m&&m.cover_xl)}).catch(()=>'')}
 function dzPreview(artist,title){return cached('dzt:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/track?limit=5&q='+enc(`artist:"${artist}" track:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.preview)||''}).catch(()=>'')}
 
 /* ---------- copertine ---------- */
@@ -508,7 +510,7 @@ if(title){const w=await (await fetch(`https://${lang}.wikipedia.org/w/api.php?ac
 return{lang,title,img:img?`https://commons.wikimedia.org/wiki/Special:FilePath/${enc(img)}?width=1000`:'',text}})}
 
 function dzArtistId(name){return cached('dzid:'+name,30*DAY,async()=>{const d=await dz('search/artist?limit=6&q='+enc(name));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(name))||L[0];return m?m.id:0}).catch(()=>0)}
-function similarArtists(name){return cached('dzsim:'+name,14*DAY,async()=>{const id=await dzArtistId(name);if(!id)return[];const d=await dz(`artist/${id}/related?limit=15`);return((d&&d.data)||[]).map(a=>({name:a.name,img:a.picture_medium||''}))}).catch(()=>[])}
+function similarArtists(name){return cached('dzsim:'+name,14*DAY,async()=>{const id=await dzArtistId(name);if(!id)return[];const d=await dz(`artist/${id}/related?limit=15`);return((d&&d.data)||[]).map(a=>({name:a.name,img:dzImg(a.picture_medium)}))}).catch(()=>[])}
 window.openArtist=async function(name){toast('Apro '+name+'…');try{const j=await mb(`artist?query=${enc('artist:"'+name+'"')}&limit=5`);const a=(j.artists||[]).find(x=>norm(x.name)===norm(name))||(j.artists||[])[0];if(a)go('artista/'+a.id);else toast('Artista non trovato')}catch(e){toast('Riprova tra un attimo')}};
 function dayHash(str){let h=0;for(const c of str)h=(h*131+c.charCodeAt(0))>>>0;return h}
 function weekKey(){const d=new Date();const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-dn+3);const y=t.getUTCFullYear();return y+'-'+Math.ceil(((t-Date.UTC(y,0,1))/DAY+1)/7)}
@@ -532,7 +534,7 @@ function topTracks(name){return cached('top7:'+name+(K.spRef?':sp':'')+(S.settin
 const add=(t,src,raw,extra)=>{if(!t||isAlt(t))return;const k=norm(baseTitle(t));if(!k)return;
 const o=T[k]||(T[k]={t:baseTitle(t),v:{}});if(raw>(o.v[src]||0))o.v[src]=raw;for(const [kk,v] of Object.entries(extra||{}))if(v&&!o[kk])o[kk]=v};
 const zipf=i=>1/Math.pow(i+1,0.8);
-if(id){try{const d=await dz(`artist/${id}/top?limit=50`);const L=(d&&d.data)||[];R.dz=L.length;L.forEach((x,i)=>add(x.title_short||x.title,'dz',zipf(i),{album:x.album?.title||'',cover:x.album?.cover_medium||'',prev:x.preview||'',dur:x.duration?`${Math.floor(x.duration/60)}:${String(x.duration%60).padStart(2,'0')}`:''}))}catch(e){}}
+if(id){try{const d=await dz(`artist/${id}/top?limit=50`);const L=(d&&d.data)||[];R.dz=L.length;L.forEach((x,i)=>add(x.title_short||x.title,'dz',zipf(i),{album:x.album?.title||'',cover:dzImg(x.album?.cover_medium),prev:x.preview||'',dur:x.duration?`${Math.floor(x.duration/60)}:${String(x.duration%60).padStart(2,'0')}`:''}))}catch(e){}}
 if(S.settings.lf){try{const r=await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptracks&artist=${enc(name)}&autocorrect=1&limit=50&api_key=${enc(S.settings.lf)}&format=json`);const j=await r.json();const L=(j.toptracks&&j.toptracks.track)||[];R.lf=L.length;L.forEach((x,i)=>add(x.name,'lf',+x.playcount||zipf(i),{}))}catch(e){}}
 if(S.settings.yt){try{const r=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&order=viewCount&maxResults=50&q=${enc(name)}&key=${enc(S.settings.yt)}`);const j=await r.json();const an=norm(name);const V=[];
 (j.items||[]).forEach(v=>{const ti=(v.snippet?.title||'').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"');const ch=norm(v.snippet?.channelTitle||'');if(!norm(ti).includes(an)&&!ch.includes(an))return;
@@ -554,7 +556,7 @@ return out.sort((a,b)=>b.score-a.score).slice(0,30)}).catch(()=>[])}
 function spBtn(a,t){return `<a class="play" style="background:rgba(30,215,96,.15);color:#1ed760" target="_blank" href="https://open.spotify.com/search/${enc((t+' '+a).replace(/\s*\(.*?\)\s*/g,' ').trim())}" title="Apri su Spotify"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.6 14.4a.6.6 0 0 1-.9.2c-2.4-1.5-5.4-1.8-9-1a.6.6 0 1 1-.3-1.2c3.9-.9 7.2-.5 9.9 1.1.3.2.4.6.3.9zm1.2-2.7a.8.8 0 0 1-1.1.3c-2.7-1.7-6.9-2.2-10.2-1.2a.8.8 0 0 1-.5-1.5c3.7-1.1 8.3-.6 11.4 1.3.4.2.5.7.4 1.1zm.1-2.8C14.7 9 9.4 8.8 6.3 9.7a.9.9 0 1 1-.5-1.8c3.5-1.1 9.4-.9 13.1 1.3a.9.9 0 0 1-1 1.7z"/></svg></a>`}
 function trackCover(a,t){const ar=a.split(', ')[0];const tt=t.replace(/\s*[\(\[].*?[\)\]]\s*/g,' ').replace(/\s+-\s+.*$/,'').trim();
 return cached('tc2:'+ar+'|'+tt,60*DAY,async()=>{for(const q of[`${ar} ${tt}`,`artist:"${ar}" track:"${tt}"`,`${tt}`]){try{const d=await dz('search/track?limit=5&q='+enc(q));const L=(d&&d.data)||[];
-const m=L.find(x=>norm(x.artist?.name)===norm(ar))||(q===tt?null:L[0]);if(m&&m.album?.cover_medium)return m.album.cover_medium}catch(e){}}return ''}).catch(()=>'')}
+const m=L.find(x=>norm(x.artist?.name)===norm(ar))||(q===tt?null:L[0]);if(m&&dzImg(m.album?.cover_medium))return m.album.cover_medium}catch(e){}}return ''}).catch(()=>'')}
 function wrTracks(w){return (w.pl||w.tr||[]).map(x=>({t:x.t,a:x.a,img:x.img||'',p:x.p}))}
 function fillCovers(root){const els=[...root.querySelectorAll('[data-tc]')];els.forEach(el=>{try{const [a,t]=JSON.parse(el.dataset.tc);el.style.backgroundColor=`hsl(${hue(t)},32%,24%)`}catch(e){}});
 const q=[];let busy=0;const run=()=>{while(busy<3&&q.length){const el=q.shift();if(!el.isConnected||el.dataset.done)continue;el.dataset.done=1;busy++;const [a,t]=JSON.parse(el.dataset.tc);
@@ -690,7 +692,7 @@ for(let i=0;i<yrs.length;i++){const y=yrs[i],ny=(yrs[i+1]||end+1)-1;if(y>ny)cont
 const last=out[out.length-1];if(last&&last.names.join()===nm.join()){last.to=ny;continue}out.push({from:y,to:ny,names:nm})}
 return out.length>1?out.slice(-8):[]}
 function dzReleases(name){return cached('dzrel:'+name,2*DAY,async()=>{const id=await dzArtistId(name);if(!id)return[];const d=await dz(`artist/${id}/albums?limit=100`);
-return((d&&d.data)||[]).map(x=>({t:x.title,d:x.release_date||'',k:x.record_type,img:x.cover_medium||'',dz:x.id}))}).catch(()=>[])}
+return((d&&d.data)||[]).map(x=>({t:x.title,d:x.release_date||'',k:x.record_type,img:dzImg(x.cover_medium),dz:x.id}))}).catch(()=>[])}
 /* ---------- Da scoprire: dischi nuovi in base ai tuoi gusti ---------- */
 async function discoveries(){const key='ol-disc-'+today();try{const c=JSON.parse(localStorage.getItem(key)||'null');if(c)return c}catch(e){}
 const mine=new Set(Object.values(S.artists).map(a=>norm(a.name)));const cdCount={};Object.values(S.albums).filter(v=>v.cd).forEach(v=>cdCount[v.a]=(cdCount[v.a]||0)+1);
