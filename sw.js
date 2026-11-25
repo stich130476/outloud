@@ -1,4 +1,4 @@
-const C='outloud-v20',IMG='outloud-img-v1',MAXIMG=600;
+const C='outloud-v21',IMG='outloud-img-v1',MAXIMG=600;
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['./','./index.html','./manifest.json','./icon-192.png','./apple-touch-icon.png?v=2'])))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C&&x!==IMG).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 // copertine e foto: dalla memoria del telefono (istantanee), scaricate una sola volta
