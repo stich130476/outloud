@@ -345,7 +345,7 @@ html{scrollbar-color:rgba(214,179,106,.3) transparent}
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.70';
+const VER='1.71';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -427,6 +427,13 @@ if(!u){const wd=(j.relations||[]).find(r=>r.type==='wikidata');if(wd){const w=aw
 if(!u&&a&&a.mbid){try{const D=await discography(a.mbid,false);const al=D.filter(r=>typeOf(r)==='Album'&&r.d&&covMap[r.id]!=='-').sort((x,y)=>x.d.localeCompare(y.d))[0];if(al)u=covMap[al.id]||caa(al.id,250)}catch(e){}}
 await idb.set(key,{t:Date.now(),v:u,r:3});return u})().catch(()=>'')}
 function dzCover(artist,title){return cached('dzc2:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/album?limit=5&q='+enc(`artist:"${artist}" album:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return dzImg(m&&m.cover_xl)}).catch(()=>'')}
+/* copertina da altre fonti, sempre con artista e titolo che coincidono: Apple Music, Spotify, poi Deezer con ricerca libera */
+const edNorm=t=>norm(baseTitle(String(t||'').replace(/\s*[-–:]\s*(single|ep)$/i,'')));
+function altCover(artist,title){return cached('altc:'+artist+'|'+title,7*DAY,async()=>{const A=norm(artist),T=edNorm(title);
+try{const r=await jsonp(`https://itunes.apple.com/search?term=${enc(artist+' '+baseTitle(title))}&entity=album&limit=15&country=it`);const m=((r&&r.results)||[]).find(x=>norm(x.artistName)===A&&edNorm(x.collectionName)===T);if(m&&m.artworkUrl100)return m.artworkUrl100.replace(/\/\d+x\d+bb\./,'/600x600bb.')}catch(e){}
+try{const tok=await spToken();if(tok){const r=await fetch(`https://api.spotify.com/v1/search?type=album&limit=10&market=IT&q=${enc(`album:${baseTitle(title)} artist:${artist}`)}`,{headers:{Authorization:'Bearer '+tok}});if(r.ok){const j=await r.json();const m=(j.albums?.items||[]).find(x=>(x.artists||[]).some(a=>norm(a.name)===A)&&edNorm(x.name)===T);const u=m&&((m.images||[])[0]||{}).url;if(u)return u}}}catch(e){}
+try{const d=await dz('search/album?limit=10&q='+enc(artist+' '+baseTitle(title)));const m=((d&&d.data)||[]).find(x=>norm(x.artist?.name)===A&&edNorm(x.title)===T);const u=dzImg(m&&m.cover_xl);if(u)return u}catch(e){}
+return ''}).catch(()=>'')}
 function dzPreview(artist,title){return cached('dzt:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/track?limit=5&q='+enc(`artist:"${artist}" track:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.preview)||''}).catch(()=>'')}
 
 /* ---------- copertine ---------- */
@@ -435,12 +442,15 @@ function phHTML(title,sub){const h=hue(title);const ini=String(title||'?').repla
 return `<div class="ph" style="background:linear-gradient(135deg,hsl(${h},35%,28%),hsl(${(h+50)%360},40%,14%))"><div>${esc(ini)}${sub?`<small>${esc(sub)}</small>`:''}</div></div>`}
 function caa(id,sz=250){return `https://coverartarchive.org/release-group/${id}/front-${sz}`}
 let covMap;try{covMap=JSON.parse(localStorage.getItem('ol-cov')||'{}')}catch(e){covMap={}}
-function saveCov(){try{localStorage.setItem('ol-cov',JSON.stringify(covMap))}catch(e){}}
+function saveCov(){try{localStorage.setItem('ol-cov',JSON.stringify(covMap));localStorage.setItem('ol-covmiss',JSON.stringify(covMiss))}catch(e){}}
+/* pulizia: le copertine segnate come mancanti si ricercano dopo 3 giorni; i segnaposto di Deezer non valgono */
+let covMiss;try{covMiss=JSON.parse(localStorage.getItem('ol-covmiss')||'{}')}catch(e){covMiss={}}
+(()=>{let ch=false;for(const[k,v]of Object.entries(covMap)){if((v==='-'&&!(Date.now()-(covMiss[k]||0)<3*DAY))||(v&&v!=='-'&&DZBLANK.test(v))){delete covMap[k];delete covMiss[k];ch=true}}if(ch)saveCov()})();
 function coverImg(id,artist,title,sz=250){const alt=covMap[id];if(alt==='-')return phHTML(title,artist);return `<img loading="lazy" src="${alt||caa(id,sz)}" data-id="${id}" data-a="${esc(artist)}" data-t="${esc(title)}" onerror="coverFail(this)" onload="wallAdd(this)" alt="">`}
 let wallT,wallL;try{wallL=JSON.parse(localStorage.getItem('ol-wall')||'[]')}catch(e){wallL=[]}
 window.wallAdd=function(el){const u=el.currentSrc||el.src;if(!u||u.startsWith('data:')||wallL.includes(u))return;wallL.unshift(u);if(wallL.length>140)wallL.length=140;clearTimeout(wallT);wallT=setTimeout(()=>{try{localStorage.setItem('ol-wall',JSON.stringify(wallL))}catch(e){}},1500)};
-window.coverFail=async function(el){const id=el.dataset.id;if(el.dataset.tried){if(id){covMap[id]='-';saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a);return}el.dataset.tried=1;if(id&&covMap[id]){delete covMap[id];saveCov()}
-const u=await dzCover(el.dataset.a,el.dataset.t);if(u){el.src=u;if(id){covMap[id]=u;saveCov()}}else{if(id){covMap[id]='-';saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a)}};
+window.coverFail=async function(el){const id=el.dataset.id;if(el.dataset.tried){if(id){covMap[id]='-';covMiss[id]=Date.now();saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a);return}el.dataset.tried=1;el.style.visibility='hidden';el.onload=()=>{el.style.visibility='';wallAdd(el)};if(id&&covMap[id]){delete covMap[id];saveCov()}
+const u=(await altCover(el.dataset.a,el.dataset.t))||(await dzCover(el.dataset.a,el.dataset.t));if(u){el.src=u;if(id){covMap[id]=u;saveCov()}}else{if(id){covMap[id]='-';covMiss[id]=Date.now();saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a)}};
 function avatar(name,cls='pic'){const id='p'+Math.random().toString(36).slice(2);artistPhoto(name).then(u=>{const e=document.getElementById(id);if(e)e.innerHTML=u?`<img src="${u}" alt="" loading="lazy" onload="wallAdd(this)" onerror="this.outerHTML=this.dataset.ph" data-ph="${esc(phHTML(name))}">`:phHTML(name)});return `<div class="${cls}" id="${id}">${phHTML(name)}</div>`}
 
 /* ---------- date ---------- */
@@ -484,6 +494,13 @@ if(route().v==='home')render()})();try{await checking}finally{checking=null}}
 async function newsList(){const cutoff=new Date(Date.now()-75*DAY).toISOString().slice(0,10);const out=[];
 for(const id of Object.keys(S.artists)){const c=await idb.get('disc:'+id);if(!c)continue;for(const r of c.v)if(r.d&&r.d>=cutoff)out.push({...r,artist:S.artists[id].name,aid:id})}
 return out.sort((a,b)=>b.d.localeCompare(a.d))}
+/* stessa uscita in più versioni (deluxe, rimasterizzata, singolo omonimo, stesso disco sotto due artisti): una sola scheda */
+const EDRE=/\b(deluxe|expanded|remaster(ed)?|anniversary|edition|edizione|version|versione|bonus|special|super|collector'?s?|reissue|explicit|clean)\b/i;
+function edKey(t){return norm(baseTitle(String(t||'').replace(/\s*[\(\[][^\)\]]*[\)\]]/g,'').replace(/\s*[-–:]\s*(single|ep|deluxe.*|remaster.*|.*edition)$/i,'')))}
+function dedupNews(L){const rank=x=>{const ty=typeOf(x);return (covMap[x.id]==='-'?100:0)+(EDRE.test(x.t)?10:0)+(ty==='Album'?0:ty==='EP'?1:ty==='Singolo'?2:3)};
+const byId={};L.forEach(x=>{const o=byId[x.id];if(!o)byId[x.id]={...x,artists:[x.artist]};else if(!o.artists.includes(x.artist)){o.artists.push(x.artist);if(isPrio(x.aid)&&!isPrio(o.aid))o.aid=x.aid}});
+const G={};Object.values(byId).forEach(x=>{const k=edKey(x.t)+'|'+norm(x.artists.slice().sort()[0]);(G[k]=G[k]||[]).push(x)});
+return Object.values(G).map(g=>{const best=g.slice().sort((a,b)=>rank(a)-rank(b)||a.d.localeCompare(b.d))[0];const d=g.map(x=>x.d).sort()[0];return {...best,d:best.d||d,artist:best.artists.join(' & '),dup:g.length}}).sort((a,b)=>b.d.localeCompare(a.d))}
 async function onThisDay(){const md=today().slice(5),y=+today().slice(0,4),out=[];
 for(const id of Object.keys(S.artists)){const c=await idb.get('disc:'+id);if(!c)continue;for(const r of c.v){const ty=typeOf(r);if((ty==='Album'||ty==='EP')&&r.d.length===10&&r.d.slice(5)===md&&+r.d.slice(0,4)<y)out.push({...r,artist:S.artists[id].name,aid:id,yrs:y-+r.d.slice(0,4)})}}
 return out.sort((a,b)=>b.yrs-a.yrs)}
@@ -599,7 +616,7 @@ app.innerHTML=`<div class="top"><div><div class="brandrow"><div class="logo bran
 ${n?`<div id="hn">${loading}</div>`:`<div class="card empty" style="margin-top:20px"><h3>Benvenuto in OutLoud!</h3><p>Aggiungi i tuoi artisti per ricevere nuove uscite, concerti e discografie complete.</p><div class="row" style="justify-content:center;flex-wrap:wrap;gap:10px;margin-top:16px"><button class="btn" onclick="spLogin()">Importa da Spotify</button><a class="btn ghost" href="#cerca">Cerca un artista</a></div></div>`}
 <div class="sign">OutLoud! ${VER} · Stefano Fasolato 🖤💙</div>`;
 setProgress(progressTxt);if(!n)return;
-const news=await newsList();if(!ok())return;
+const news=dedupNews(await newsList());if(!ok())return;
 const fut=news.filter(x=>x.d>today()).sort((a,b)=>a.d.localeCompare(b.d)),past=news.filter(x=>x.d<=today());
 const nnew=news.filter(x=>S.seen[x.id]==='new').length;
 const card=x=>`<a class="news${isPrio(x.aid)?' prio':''}" href="#album/${x.id}"><div class="cov">${coverImg(x.id,x.artist,x.t,500)}${S.seen[x.id]==='new'?'<span class="badge">Nuovo</span>':''}</div><div class="t">${esc(x.t)}</div><div class="a">${isPrio(x.aid)?'<span class="prioStar">★</span> ':''}${esc(x.artist)}</div><div class="m"><span class="chip" style="margin:0">${typeOf(x)}</span>${whenBadge(x.d)||`<span class="small muted">${fmtDate(x.d)}</span>`}</div></a>`;
