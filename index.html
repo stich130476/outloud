@@ -234,6 +234,12 @@ body.day .lo-loud{background-image:linear-gradient(100deg,#6b4f17 0%,#b88a2e 30%
 #intro p{color:#b5ad9d;letter-spacing:.38em;text-transform:uppercase;font-size:11px;margin-top:18px;opacity:0;animation:fadeup .9s 1.5s forwards}
 #intro .ienter{margin-top:34px;padding:15px 50px;border-radius:99px;font:700 17px var(--sans);color:#1a130a;background:linear-gradient(120deg,#fff1c9,#e2bb6a 55%,#b38a3e);box-shadow:0 14px 40px rgba(214,179,106,.35);opacity:0;animation:fadeup .9s 1.8s forwards}
 #intro .ienter:active{transform:scale(.96)}
+#intro .isync{margin:22px auto 0;max-width:300px;color:#b9b2a4;font-size:13.5px;line-height:1.55;text-align:center;opacity:0;animation:fadeup .9s 2.3s forwards}
+#intro .isync:empty{display:none}#intro .isync b{color:#f2dca4;font-weight:600}
+#intro .isync .ilink{display:inline-block;margin-top:12px;padding:9px 22px;border-radius:99px;border:1px solid rgba(214,179,106,.55);color:#f2dca4;font:600 13.5px var(--sans);background:rgba(214,179,106,.08)}
+#intro .isync .ipulse{display:inline-block;width:7px;height:7px;border-radius:50%;background:#d6b36a;margin-right:8px;vertical-align:1px;animation:ipulse 1.2s ease-in-out infinite}
+@keyframes ipulse{0%,100%{opacity:.25}50%{opacity:1}}
+body.day #intro .isync{color:#6f695e}body.day #intro .isync b,body.day #intro .isync .ilink{color:#7d5e1c}
 #intro .istats{margin-top:18px;color:#8f887b;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:0;animation:fadeup .9s 2.1s forwards}
 #intro .ctr{display:flex;flex-direction:column;align-items:center;position:absolute;left:0;right:0;bottom:0;padding:0 24px calc(env(safe-area-inset-bottom) + 48px)}
 #intro .wall{top:38%;min-height:150vmax}
@@ -298,12 +304,12 @@ nav.bn{width:560px}
 </head>
 <body>
 <div id="intro"><div class="wall" id="wall"></div><div class="beams"><i></i><i></i></div><div class="vig"></div>
-<div class="ctr"><div class="logo"><span class="lo-out">OUT</span><span class="lo-loud" id="ilogo"></span></div><div class="eq" id="ieq"></div><p>la tua musica, ad alta voce</p><button class="ienter" id="ienter">Entra</button><div class="istats" id="istats"></div></div></div>
+<div class="ctr"><div class="logo"><span class="lo-out">OUT</span><span class="lo-loud" id="ilogo"></span></div><div class="eq" id="ieq"></div><p>la tua musica, ad alta voce</p><button class="ienter" id="ienter">Entra</button><div class="istats" id="istats"></div><div class="isync" id="isync"></div></div></div>
 <div id="app"></div>
 <nav class="bn" id="nav"></nav>
 <script>
 'use strict';
-const VER='1.66';
+const VER='1.68';
 const OWNER_DEFAULT='stich130476';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -367,10 +373,21 @@ s.src='https://api.deezer.com/'+path+(path.includes('?')?'&':'?')+'output=jsonp&
 function dz(path){const p=dzChain.then(async()=>{const w=dzLast+125-Date.now();if(w>0)await sleep(w);dzLast=Date.now()}).then(async()=>{for(let t=0;t<3;t++){try{return await dzRaw(path)}catch(e){if(t===2)throw e;await sleep(1500*(t+1))}}});dzChain=p.catch(()=>{});return p}
 const photoMem={};
 function artistPhoto(name){if(!name)return Promise.resolve('');if(photoMem[name])return photoMem[name];
-return photoMem[name]=(async()=>{const key='ph2:'+name;const c=await idb.get(key);if(c&&(c.v?Date.now()-c.t<30*DAY:Date.now()-c.t<2*DAY))return c.v;
-let u='';try{const d=await dz('search/artist?limit=8&q='+enc(name));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(name))||L.find(a=>norm(a.name).startsWith(norm(name)))||null;const x=m&&m.picture_xl;if(x&&!/\/artist\/\//.test(x))u=x}catch(e){if(c&&c.v)return c.v}
-if(!u&&mbQ.length<3){const a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));if(a){try{const j=await mbc(`artist/${a.mbid}?inc=url-rels`,30*DAY,false);const wd=(j.relations||[]).find(r=>r.type==='wikidata');if(wd){const w=await wikiInfo(wd.url.resource.split('/').pop());u=w.img||''}}catch(e){}}}
-await idb.set(key,{t:Date.now(),v:u});return u})().catch(()=>'')}
+return photoMem[name]=(async()=>{const key='ph2:'+name;const c=await idb.get(key);if(c&&(c.v?Date.now()-c.t<30*DAY:(c.r===3&&Date.now()-c.t<2*DAY)))return c.v;
+/* Deezer per nome esatto (anche senza punti: "C.S.I." = "CSI") */
+const dzFind=async n=>{const d=await dz('search/artist?limit=8&q='+enc(n));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.name)===norm(n))||L.find(a=>norm(a.name).startsWith(norm(n))&&norm(n).length>4)||null;const x=m&&m.picture_xl;return x&&!/\/artist\/\//.test(x)?x:''};
+let u='';try{u=await dzFind(name)}catch(e){if(c&&c.v)return c.v}
+const a=Object.values(S.artists).find(x=>norm(x.name)===norm(name));
+/* Spotify: stesso artista per codice, nessun rischio di omonimi */
+if(!u&&a&&a.spotifyId){try{const tok=await spToken();if(tok){const r=await fetch(`https://api.spotify.com/v1/artists/${a.spotifyId}`,{headers:{Authorization:'Bearer '+tok}});if(r.ok){const j=await r.json();u=((j.images||[])[0]||{}).url||''}}}catch(e){}}
+/* MusicBrainz: nomi alternativi ufficiali (es. Consorzio Suonatori Indipendenti → C.S.I.) su Deezer, poi Wikidata */
+if(!u&&a&&a.mbid&&mbQ.length<3){try{const j=await mbc(`artist/${a.mbid}?inc=aliases+url-rels`,30*DAY,false);
+const al=[...new Set([j.name,j['sort-name'],...(j.aliases||[]).map(x=>x.name)].filter(x=>x&&norm(x)&&norm(x)!==norm(name)))].slice(0,4);
+for(const n of al){if(u)break;try{u=await dzFind(n)}catch(e){}}
+if(!u){const wd=(j.relations||[]).find(r=>r.type==='wikidata');if(wd){const w=await wikiInfo(wd.url.resource.split('/').pop());u=w.img||''}}}catch(e){}}
+/* ultima risorsa: la copertina del primo album in studio (stesso artista, per codice MusicBrainz) */
+if(!u&&a&&a.mbid){try{const D=await discography(a.mbid,false);const al=D.filter(r=>typeOf(r)==='Album'&&r.d&&covMap[r.id]!=='-').sort((x,y)=>x.d.localeCompare(y.d))[0];if(al)u=covMap[al.id]||caa(al.id,250)}catch(e){}}
+await idb.set(key,{t:Date.now(),v:u,r:3});return u})().catch(()=>'')}
 function dzCover(artist,title){return cached('dzc:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/album?limit=5&q='+enc(`artist:"${artist}" album:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.cover_xl)||''}).catch(()=>'')}
 function dzPreview(artist,title){return cached('dzt:'+artist+'|'+title,30*DAY,async()=>{const d=await dz('search/track?limit=5&q='+enc(`artist:"${artist}" track:"${title}"`));const L=(d&&d.data)||[];const m=L.find(a=>norm(a.title)===norm(title))||L[0];return (m&&m.preview)||''}).catch(()=>'')}
 
@@ -386,7 +403,7 @@ let wallT,wallL;try{wallL=JSON.parse(localStorage.getItem('ol-wall')||'[]')}catc
 window.wallAdd=function(el){const u=el.currentSrc||el.src;if(!u||u.startsWith('data:')||wallL.includes(u))return;wallL.unshift(u);if(wallL.length>140)wallL.length=140;clearTimeout(wallT);wallT=setTimeout(()=>{try{localStorage.setItem('ol-wall',JSON.stringify(wallL))}catch(e){}},1500)};
 window.coverFail=async function(el){const id=el.dataset.id;if(el.dataset.tried){if(id){covMap[id]='-';saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a);return}el.dataset.tried=1;if(id&&covMap[id]){delete covMap[id];saveCov()}
 const u=await dzCover(el.dataset.a,el.dataset.t);if(u){el.src=u;if(id){covMap[id]=u;saveCov()}}else{if(id){covMap[id]='-';saveCov()}el.outerHTML=phHTML(el.dataset.t,el.dataset.a)}};
-function avatar(name,cls='pic'){const id='p'+Math.random().toString(36).slice(2);artistPhoto(name).then(u=>{const e=document.getElementById(id);if(e)e.innerHTML=u?`<img src="${u}" alt="" loading="lazy" onload="wallAdd(this)">`:phHTML(name)});return `<div class="${cls}" id="${id}">${phHTML(name)}</div>`}
+function avatar(name,cls='pic'){const id='p'+Math.random().toString(36).slice(2);artistPhoto(name).then(u=>{const e=document.getElementById(id);if(e)e.innerHTML=u?`<img src="${u}" alt="" loading="lazy" onload="wallAdd(this)" onerror="this.outerHTML=this.dataset.ph" data-ph="${esc(phHTML(name))}">`:phHTML(name)});return `<div class="${cls}" id="${id}">${phHTML(name)}</div>`}
 
 /* ---------- date ---------- */
 function fmtDate(d){if(!d)return'data ignota';const p=d.split('-');if(p.length===1)return p[0];if(p.length===2)return MESI[+p[1]-1]+' '+p[0];return (+p[2])+' '+MESI[+p[1]-1]+' '+p[0]}
@@ -1115,19 +1132,23 @@ Object.entries(S.albums).filter(([,v])=>v.cd).forEach(([id])=>{if(covMap[id]==='
 wallL.forEach(add);return out.sort(()=>Math.random()-.5)}
 function intro(){const el=$('#intro');let done=false;const hide=()=>{if(done)return;done=true;el.classList.add('hide');setTimeout(()=>el.style.display='none',1000)};
 if(sessionStorage.getItem('ol-intro')){el.style.display='none';return}sessionStorage.setItem('ol-intro',1);
-$('#ienter').onclick=hide;
+$('#ienter').onclick=hide;window.introHide=hide;
 $('#ilogo').innerHTML=[...'Loud!'].map((c,i)=>`<span style="animation-delay:${150+i*110}ms">${c}</span>`).join('');
-$('#ieq').outerHTML=eqHTML(22);
+$('#ieq').outerHTML=eqHTML(22);introFill(K.gh?'wait':'')}
+/* riempie muro, numeri e messaggio dell'intro; richiamata quando la sincronizzazione porta i dati */
+function introFill(st){const el=$('#intro');if(!el||el.style.display==='none'||el.classList.contains('hide'))return;
 const na=Object.keys(S.artists).length,nc=Object.values(S.albums).filter(v=>v.cd).length,nn=Object.values(S.seen||{}).filter(v=>v==='new').length;
 $('#istats').textContent=na||nc?`${na} artisti · ${nc} CD${nn?' · '+nn+' novità':''}`:'';
-const urls=introCovers();
+const urls=$('#wall').classList.contains('on')?[]:introCovers();
 if(urls.length){const rows=5,per=Math.max(innerWidth>800?16:10,Math.min(18,Math.floor(urls.length/rows)));let html='';for(let r=0;r<rows;r++){const seg=[];for(let i=0;i<per;i++)seg.push(urls[(r*per+i)%urls.length]);const imgs=seg.map(u=>`<img src="${esc(u)}" decoding="async" style="opacity:0;transition:opacity .5s" onload="this.style.opacity=1" onerror="this.style.visibility='hidden'" alt="">`).join('');html+=`<div class="wrow ${r%2?'rev':''}" style="animation-duration:${60+r*12}s">${imgs}${imgs}</div>`}
-$('#wall').innerHTML=html;$('#wall').classList.add('on')}}
+$('#wall').innerHTML=html;$('#wall').classList.add('on')}
+$('#isync').innerHTML=na||nc?'':st==='wait'?'<span class="ipulse"></span>Recupero la tua musica da GitHub…':st?`La sincronizzazione non è riuscita (${esc(st)}).<br><button class="ilink" onclick="introSync()">Controlla il token</button>`:'Su questo dispositivo la tua musica non c\'è ancora.<br><button class="ilink" onclick="introSync()">Collega la sincronizzazione</button>'}
+window.introSync=function(){if(window.introHide)introHide();go('impostazioni');setTimeout(()=>{const t=$('#ght');if(t){t.scrollIntoView({block:'center',behavior:'smooth'});t.focus()}},450)};
 
 /* ---------- avvio ---------- */
 applyTheme();try{fixWrapped()}catch(e){}intro();render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-(async()=>{await spCallback();if(K.gh){try{await syncNow()}catch(e){}}setTimeout(async()=>{await initPrio();autoWrapped();await checkNews();checkGigs()},1500)})();
+(async()=>{await spCallback();if(K.gh){try{await syncNow();introFill()}catch(e){introFill(e.message||'errore')}}setTimeout(async()=>{await initPrio();autoWrapped();await checkNews();checkGigs()},1500)})();
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){(K.gh?syncNow().catch(()=>{}):Promise.resolve()).then(()=>autoWrapped());checkNews()}});
 </script>
 </body>
